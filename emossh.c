@@ -2,43 +2,76 @@
 #include <stdlib.h>
 #include <libssh/libssh.h>
 
-int main() {
-  printf("EMOTIVE SSH CLIENT...\n");
+const char *emojis = "🌀🌂🌅🌈🌙🌞🌟🌠🌰🌱🌲🌳🌴🌵🌷🌸🌹🌺🌻🌼🌽🌾🌿🍀🍁🍂🍃🍄🍅🍆🍇🍈🍉🍊🍋🍌🍍🍎🍏🍐🍑🍒🍓🍔🍕🍖🍗🍘🍜🍝🍞🍟🍠🍡🍢🍣🍤🍥🍦🍧🍨🍩🍪🍫🍬🍭🍮🍯🍰🍱🍲🍳🍴🍵🍶🍷🍸🍹🍺🍻🍼🎀🎁🎂🎃🎄🎅🎈🎉🎊🎋🎌🎍🎎🎏🎒🎓🎠🎡🎢🎣🎤🎥🎦🎧🎨🎩🎪🎫🎬🎭🎮🎯🎰🎱🎲🎳🎴🎵🎷🎸🎹🎺🎻🎽🎾🎿🏀🏁🏂🏃🏄🏆🏇🏈🏉🏊🐀🐁🐂🐃🐄🐅🐆🐇🐈🐉🐊🐋🐌🐍🐎🐏🐐🐑🐒🐓🐔🐕🐖🐗🐘🐙🐚🐛🐜🐝🐞🐟🐠🐡🐢🐣🐤🐥🐦🐧🐨🐩🐪🐫🐬🐭🐮🐯🐰🐱🐲🐳🐴🐵🐶🐷🐸🐹🐺🐻🐼🐽🐾👀👂👃👄👅👆👇👈👉👊👋👌👍👎👏👐👑👒👓👔👕👖👗👘👙👚👛👜👝👞👟👠👡👢👣👤👥👦👧👨👩👪👮👯👺👻👼👽👾👿💀💁💂💃💄💅";
+
+int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, unsigned char **hostkeys, int hk_len) {
 
   size_t hlen;
-  ssh_session session;
-  ssh_key srv_pubkey;
-  unsigned char *hash = NULL;
+  ssh_key pubkey;
   char *hexa;
-  char buf[10];
+  int i;
 
+  for (i=0; i<hk_len; i++) {
+    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeytypes[i]) != 0) {
+      fprintf(stderr, "Error setting SSH option for host key '%s': %s\n", hostkeytypes[i], ssh_get_error(session));
+      return -1;
+    }
+
+    if (ssh_connect(session) != SSH_OK) {
+      fprintf(stderr, "Error connecting to localhost: %s\n", ssh_get_error(session));
+      return -1;
+    }
+
+    if (ssh_get_publickey(session, &pubkey) != SSH_OK) {
+      fprintf(stderr, "Error getting public key: %s\n", ssh_get_error(session));
+      return -1;
+    }
+
+    if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys[i], &hlen) != 0) {
+      fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
+      return -1;
+    }
+
+    ssh_disconnect(session);
+
+    hexa = ssh_get_hexa(hostkeys[i], hlen);
+    printf("%s (%s)\n", hexa, hostkeytypes[i]);
+    printf("hlen: %i\n", hlen); 
+  }
+
+  ssh_key_free(pubkey);
+}
+
+int main() {
+  int hk_len = 3;
+  unsigned char *hostkeytypes[hk_len];
+  hostkeytypes[0] = "ecdsa-sha2-nistp256";
+  hostkeytypes[1] = "ssh-dss"; 
+  hostkeytypes[2] = "ssh-rsa";
+
+  char *hostname = "localhost";
+  /*unsigned int port = 22;*/
+  char *port = "22";
+  
+  unsigned char *hostkeys[hk_len];
+  int i;
+  for (i=0; i<hk_len; i++) {
+    /* hex representations of MD5 hashes are 32 characters */
+    hostkeys[i] = malloc(32*sizeof(unsigned char));
+  }
+
+  ssh_session session;
   session = ssh_new();
   if (session == NULL) return -1;
 
-  ssh_options_set(session, SSH_OPTIONS_HOST, "localhost");
+  ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
+  ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
 
-  if (ssh_connect(session) != SSH_OK) {
-    fprintf(stderr, "Error connecting to localhost: %s\n", ssh_get_error(session));
-    return -1;
-  }
+  get_host_key_fingerprint(session, hostkeytypes, hostkeys, hk_len);
 
-  /*hlen = ssh_get_pubkey_hash(session, &hash);*/
-  if (ssh_get_publickey(session, &srv_pubkey) != SSH_OK) {
-    fprintf(stderr, "Error getting public key: %s\n", ssh_get_error(session));
-    return -1;
-  }
-
-  if (ssh_get_publickey_hash(srv_pubkey, SSH_PUBLICKEY_HASH_MD5, &hash, &hlen) != 0) {
-    fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
-    return -1;
-  }
-
-  hexa = ssh_get_hexa(hash, hlen);
-  printf("%s\n", hexa);
-
-  ssh_key_free(srv_pubkey);
-  ssh_clean_pubkey_hash(&hash);
-  ssh_free(session);
+  /*    hexa = ssh_get_hexa(hostkeys[i], );
+        printf("%s (%s)\n", hexa, hostkeytypes[i]);*/
 
   return 0;
 }
+

@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <libssh/libssh.h>
 
 const char *emojis = "🌀🌂🌅🌈🌙🌞🌟🌠🌰🌱🌲🌳🌴🌵🌷🌸🌹🌺🌻🌼🌽🌾🌿🍀🍁🍂🍃🍄🍅🍆🍇🍈🍉🍊🍋🍌🍍🍎🍏🍐🍑🍒🍓🍔🍕🍖🍗🍘🍜🍝🍞🍟🍠🍡🍢🍣🍤🍥🍦🍧🍨🍩🍪🍫🍬🍭🍮🍯🍰🍱🍲🍳🍴🍵🍶🍷🍸🍹🍺🍻🍼🎀🎁🎂🎃🎄🎅🎈🎉🎊🎋🎌🎍🎎🎏🎒🎓🎠🎡🎢🎣🎤🎥🎦🎧🎨🎩🎪🎫🎬🎭🎮🎯🎰🎱🎲🎳🎴🎵🎷🎸🎹🎺🎻🎽🎾🎿🏀🏁🏂🏃🏄🏆🏇🏈🏉🏊🐀🐁🐂🐃🐄🐅🐆🐇🐈🐉🐊🐋🐌🐍🐎🐏🐐🐑🐒🐓🐔🐕🐖🐗🐘🐙🐚🐛🐜🐝🐞🐟🐠🐡🐢🐣🐤🐥🐦🐧🐨🐩🐪🐫🐬🐭🐮🐯🐰🐱🐲🐳🐴🐵🐶🐷🐸🐹🐺🐻🐼🐽🐾👀👂👃👄👅👆👇👈👉👊👋👌👍👎👏👐👑👒👓👔👕👖👗👘👙👚👛👜👝👞👟👠👡👢👣👤👥👦👧👨👩👪👮👯👺👻👼👽👾👿💀💁💂💃💄💅";
+
+char *argv0;
 
 int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, unsigned char **hostkeys, int hk_len) {
 
@@ -36,22 +39,49 @@ int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, 
 
     hexa = ssh_get_hexa(hostkeys[i], hlen);
     printf("%s (%s)\n", hexa, hostkeytypes[i]);
-    printf("hlen: %i\n", hlen); 
   }
 
   ssh_key_free(pubkey);
+
+  return 0;
 }
 
-int main() {
+void usage() {
+  printf("Usage: %s [-h hostname] [-p port]\n", argv0);
+}
+
+int main(int argc, char *argv[]) {
+  argv0 = argv[0];
+  char *hostname = "localhost";
+  /*unsigned int port = 22;*/
+  char *port = "22";
+
+  int opt;
+  while ((opt = getopt(argc, argv, "h:p:")) != -1) {
+    switch (opt) {
+      case 'h': hostname = optarg; break;
+      case 'p': port = optarg; break;
+
+      case '?':
+      default:
+        usage();
+        exit(-1);
+    }
+  }
+  argc -= optind;
+  argv += optind;
+
+  /*
   int hk_len = 3;
   unsigned char *hostkeytypes[hk_len];
   hostkeytypes[0] = "ecdsa-sha2-nistp256";
   hostkeytypes[1] = "ssh-dss"; 
   hostkeytypes[2] = "ssh-rsa";
-
-  char *hostname = "localhost";
-  /*unsigned int port = 22;*/
-  char *port = "22";
+  */
+  int hk_len = 2;
+  unsigned char *hostkeytypes[hk_len];
+  hostkeytypes[0] = "ssh-rsa";
+  hostkeytypes[1] = "ssh-dss"; 
   
   unsigned char *hostkeys[hk_len];
   int i;

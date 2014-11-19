@@ -1,10 +1,49 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
+#include <limits.h>
+#include <string.h>
+#include <stdarg.h>
+
 #include <libssh/libssh.h>
+
 #include "bytemaps.h"
 
 char *argv0;
+
+typedef enum {
+  HEX,
+  EMOJI
+} dmode;
+dmode displaymode;
+
+int DEBUGMODE;
+
+dmode a2dmode(char *dmode_name) {
+  dmode dm;
+  if (strncmp(dmode_name, "hex", 3)) {
+    dm = HEX;
+  }
+  else if (strncmp(dmode_name, "emoji", 5)) {
+    dm = EMOJI;
+  }
+  else {
+    fprintf(stderr, "No such display mode: %s\n", dmode_name);
+    exit(-1);
+  }
+  return dm;
+}
+
+void dbgprintf(const char *format, ...) {
+  if (DEBUGMODE) {
+    va_list args;
+    va_start(args, format);
+    fprintf(stderr, "DEBUG: ");
+    vfprintf(stderr, format, args);
+    va_end(args);
+  }
+}
 
 void connect_or_exit_w_err(ssh_session session) {
   if (ssh_connect(session) != SSH_OK) {
@@ -16,6 +55,19 @@ void connect_or_exit_w_err(ssh_session session) {
       hostname, port, ssh_get_error(session));
     exit(-1);
   }
+}
+
+void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
+  char *os;
+  if (displaymode == HEX) {
+    os = ssh_get_hexa(hash, hash_len);
+  }
+  else if (displaymode == EMOJI) {
+    os = (char *)emoji_map;
+  }
+  outstring = &os; 
+  dbgprintf("outstring: %s\n", *outstring);
+  /* TODO: free the os memory how? */
 }
 
 int get_banners(ssh_session session) {
@@ -71,15 +123,23 @@ int get_banners(ssh_session session) {
 
 int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, unsigned char **hostkeys, int hk_len) {
 
-  size_t hlen;
+  size_t hkhash_buf_len;
   ssh_key pubkey;
   char *hexa;
   int i;
+
+  unsigned char *hkhash_buf;
+  unsigned char *hkhash_display;
+
+  unsigned char *hkhash;
 
   char *hostname; 
   unsigned int port;
   ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
   ssh_options_get_port(session, &port);
+
+  int *blockarray;
+  double blockarray_len;
 
   for (i=0; i<hk_len; i++) {
     if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeytypes[i]) != 0) {
@@ -98,13 +158,27 @@ int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, 
         return -1;
       }
 
-      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys[i], &hlen) != 0) {
+      /* The third ("hash") argument to ssh_get_publickey_hash comes back as a 
+       * character buffer of hex values. However, it's padded with zeroes. 
+
+         (lldb) frame variable hash
+         (unsigned char *) hostkey = 0x000000000119c860 "\x81\x0f\x13)\xab\xf2\xb4g\xd0\x13\x89w\x96]o\x01XXXXXXXX1"
+         (lldb) frame variable ssh_get_hexa(hash, hash_len) // this is lldb pseudocode, of course
+         (char *) hexa = 0x000000000119db70 "81:0f:13:29:ab:f2:b4:67:d0:13:89:77:96:5d:6f:01"
+
+       */
+      //if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys[i], &hlen) != 0) {
+      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, &hkhash_buf_len) != 0) {
         fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
         return -1;
       }
 
-      hexa = ssh_get_hexa(hostkeys[i], hlen);
-      printf("%s (%s)\n", hexa, hostkeytypes[i]);
+      hostkeys[i] = hkhash_buf;
+
+      char **display;
+      get_display_hash(hkhash_buf, hkhash_buf_len, display);
+
+      printf("%s (%s)\n", *display, hostkeytypes[i]);
 
     }
 
@@ -123,14 +197,18 @@ void usage() {
 
 int main(int argc, char *argv[]) {
   argv0 = argv[0];
+  DEBUGMODE = 0;
+  displaymode = HEX;
   char *hostname = "localhost";
   char *port = "22";
 
   int opt;
-  while ((opt = getopt(argc, argv, "h:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "h:p:dD")) != -1) {
     switch (opt) {
       case 'h': hostname = optarg; break;
       case 'p': port = optarg; break;
+      case 'd': a2dmode(optarg); break;
+      case 'D': DEBUGMODE = 1; break;
 
       case '?':
       default:

@@ -15,25 +15,10 @@ char *argv0;
 typedef enum {
   HEX,
   EMOJI
-} dmode;
-dmode displaymode;
+} dmode_t;
+dmode_t displaymode;
 
 int DEBUGMODE;
-
-dmode a2dmode(char *dmode_name) {
-  dmode dm;
-  if (strncmp(dmode_name, "hex", 3)) {
-    dm = HEX;
-  }
-  else if (strncmp(dmode_name, "emoji", 5)) {
-    dm = EMOJI;
-  }
-  else {
-    fprintf(stderr, "No such display mode: %s\n", dmode_name);
-    exit(-1);
-  }
-  return dm;
-}
 
 void dbgprintf(const char *format, ...) {
   if (DEBUGMODE) {
@@ -43,6 +28,21 @@ void dbgprintf(const char *format, ...) {
     vfprintf(stderr, format, args);
     va_end(args);
   }
+}
+
+dmode_t a2dmode(char *dmode_name) {
+  dmode_t dm;
+  if (strlen(dmode_name) >=3 && strncmp(dmode_name, "hex", 1) == 0) {
+    dm = HEX;
+  }
+  else if (strlen(dmode_name) >=5 && strncmp(dmode_name, "emoji", 1) == 0) {
+    dm = EMOJI;
+  }
+  else {
+    fprintf(stderr, "No such display mode: %s\n", dmode_name);
+    exit(-1);
+  }
+  return dm;
 }
 
 void connect_or_exit_w_err(ssh_session session) {
@@ -59,16 +59,22 @@ void connect_or_exit_w_err(ssh_session session) {
 
 void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
   char *os;
-  if (displaymode == HEX) {
-    os = ssh_get_hexa(hash, hash_len);
+  switch (displaymode) {
+    case HEX:
+      os = ssh_get_hexa(hash, hash_len); break;
+    case EMOJI:
+      os = (char *)emoji_map; break;
+    default:
+      fprintf(stderr, 
+              "displaymode is set to %i but I can't tell what that means ",
+              displaymode);
   }
-  else if (displaymode == EMOJI) {
-    os = (char *)emoji_map;
-  }
-  outstring = &os; 
-  dbgprintf("outstring: %s\n", *outstring);
-  /* TODO: free the os memory how? */
+  *outstring = os;
+  /* TODO: free the 'os' memory how? */
 }
+
+
+
 
 int get_banners(ssh_session session) {
   const char *sbanner, *dmessage;
@@ -175,10 +181,10 @@ int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, 
 
       hostkeys[i] = hkhash_buf;
 
-      char **display;
-      get_display_hash(hkhash_buf, hkhash_buf_len, display);
+      char *display;
+      get_display_hash(hkhash_buf, hkhash_buf_len, &display);
 
-      printf("%s (%s)\n", *display, hostkeytypes[i]);
+      printf("%s (%s)\n", display, hostkeytypes[i]);
 
     }
 
@@ -196,18 +202,20 @@ void usage() {
 }
 
 int main(int argc, char *argv[]) {
+  char *dm_str;
+
   argv0 = argv[0];
   DEBUGMODE = 0;
-  displaymode = HEX;
+  dm_str = "hex";
   char *hostname = "localhost";
   char *port = "22";
 
   int opt;
-  while ((opt = getopt(argc, argv, "h:p:dD")) != -1) {
+  while ((opt = getopt(argc, argv, "h:p:d:D")) != -1) {
     switch (opt) {
       case 'h': hostname = optarg; break;
       case 'p': port = optarg; break;
-      case 'd': a2dmode(optarg); break;
+      case 'd': dm_str = optarg; break;
       case 'D': DEBUGMODE = 1; break;
 
       case '?':
@@ -218,6 +226,8 @@ int main(int argc, char *argv[]) {
   }
   argc -= optind;
   argv += optind;
+
+  displaymode = a2dmode(dm_str);
 
   int hk_len = 3;
   unsigned char *hostkeytypes[hk_len];

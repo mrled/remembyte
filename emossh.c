@@ -24,7 +24,6 @@ void dbgprintf(const char *format, ...) {
   if (DEBUGMODE) {
     va_list args;
     va_start(args, format);
-    fprintf(stderr, "DEBUG: ");
     vfprintf(stderr, format, args);
     va_end(args);
   }
@@ -57,13 +56,71 @@ void connect_or_exit_w_err(ssh_session session) {
   }
 }
 
+char* hexbuf2emoji_old(unsigned char *hash, size_t hash_len) {
+  /* (space btwn each emoji) + (emoji are 4 wide) + (terminator \0) */ 
+  char *outstring = malloc((sizeof(char)*hash_len) + (sizeof(char)*hash_len*4) +1); 
+  unsigned int hashbyte;
+  char emojibyte[4];
+  int inctr=0, outctr=0, emoctr=0;
+  for (inctr=0; inctr<hash_len; inctr++) {
+    outctr = inctr*5;
+
+    hashbyte = (unsigned int)hash[inctr];
+    if (! (255 >= hashbyte >= 0)) {
+      fprintf(stderr, 
+              "Error: the hash buffer has a byte in it not between 0 and 256.");
+      exit(-1);
+    }
+
+    emojibyte[0] = emoji_map[hashbyte];
+    emojibyte[1] = emoji_map[hashbyte+1];
+    emojibyte[2] = emoji_map[hashbyte+2];
+    emojibyte[3] = emoji_map[hashbyte+3];
+    printf("%s", emojibyte);
+
+    outstring[outctr] = emoji_map[hashbyte];
+    outstring[outctr+1] = emoji_map[hashbyte+1];
+    outstring[outctr+2] = emoji_map[hashbyte+2];
+    outstring[outctr+3] = emoji_map[hashbyte+3];
+    outstring[outctr+4] = (char)32;
+    //    dbgprintf("emojibyte == '%c'\n", emojibyte);
+    //dbgprintf("hashbyte %s(%i) == emojibyte %s\n", (char)hashbyte, hashbyte, emojibyte);
+    //dbgprintf("hashbyte %s", (hashbyte);
+    //outstring[outctr] = emojibyte;
+    //outstring[++outctr] = " ";
+  }
+  return outstring; 
+  /* TODO: how to free this memory? */
+}
+wchar_t* hexbuf2emoji(unsigned char *hash, size_t hash_len) {
+  wchar_t outstring[hash_len];
+  unsigned int hashbyte;
+  wchar_t emojibyte;
+  int inctr=0;
+  for (inctr=0; inctr<hash_len; inctr++) {
+    hashbyte = (unsigned int)hash[inctr];
+    if (! (255 >= hashbyte >= 0)) {
+      fprintf(stderr, 
+              "Error: the hash buffer has a byte in it not between 0 and 256.");
+      exit(-1);
+    }
+
+    emojibyte = emoji_map[hashbyte];
+    printf("%ls", &emojibyte);
+
+    outstring[inctr] = emojibyte;
+  }
+  return outstring; 
+  /* TODO: how to free this memory? */
+}
+
 void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
   char *os;
   switch (displaymode) {
     case HEX:
       os = ssh_get_hexa(hash, hash_len); break;
     case EMOJI:
-      os = (char *)emoji_map; break;
+      os = hexbuf2emoji(hash, hash_len); break;
     default:
       fprintf(stderr, 
               "displaymode is set to %i but I can't tell what that means ",
@@ -72,9 +129,6 @@ void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
   *outstring = os;
   /* TODO: free the 'os' memory how? */
 }
-
-
-
 
 int get_banners(ssh_session session) {
   const char *sbanner, *dmessage;

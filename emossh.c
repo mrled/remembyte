@@ -99,11 +99,6 @@ wchar_t* hexbuf2emoji(unsigned char *hash, size_t hash_len) {
   int inctr=0;
   for (inctr=0; inctr<hash_len; inctr++) {
     hashbyte = (unsigned int)hash[inctr];
-    if (! (255 >= hashbyte >= 0)) {
-      fprintf(stderr, 
-              "Error: the hash buffer has a byte in it not between 0 and 256.");
-      exit(-1);
-    }
 
     emojibyte = emoji_map[hashbyte];
     printf("%ls", &emojibyte);

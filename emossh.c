@@ -1,8 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <math.h>
-#include <limits.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -11,12 +8,6 @@
 #include "bytemaps.h"
 
 char *argv0;
-
-typedef enum {
-  HEX,
-  EMOJI
-} dmode_t;
-dmode_t displaymode;
 
 int DEBUGMODE;
 
@@ -29,19 +20,44 @@ void dbgprintf(const char *format, ...) {
   }
 }
 
-dmode_t a2dmode(char *dmode_name) {
-  dmode_t dm;
-  if (strlen(dmode_name) >=3 && strncmp(dmode_name, "hex", 1) == 0) {
-    dm = HEX;
+typedef enum {
+  HEX,
+  EMOJI
+} mapping_t;
+mapping_t mapping;
+mapping_t a2mapping_t(char *map_name) {
+  mapping_t map;
+  if (strlen(map_name) >=3 && strncmp(map_name, "hex", 1) == 0) {
+    map = HEX;
   }
-  else if (strlen(dmode_name) >=5 && strncmp(dmode_name, "emoji", 1) == 0) {
-    dm = EMOJI;
+  else if (strlen(map_name) >=5 && strncmp(map_name, "emoji", 1) == 0) {
+    map = EMOJI;
   }
   else {
-    fprintf(stderr, "No such display mode: %s\n", dmode_name);
+    fprintf(stderr, "No such bytemap: %s\n", map_name);
     exit(-1);
   }
-  return dm;
+  return map;
+}
+
+typedef enum {
+  SSH,
+  MAP
+} action_t;
+action_t action;
+action_t a2action_t(char *action_name) {
+  action_t act;
+  if (strlen(action_name) >=3 && strncmp(action_name, "ssh", 1) == 0) {
+    act = SSH;
+  }
+  else if (strlen(action_name) >=3 && strncmp(action_name, "map", 1) == 0) {
+    act = MAP;
+  }
+  else {
+    fprintf(stderr, "No such action: %s\n", action_name);
+    exit(-1);
+  }
+  return act;
 }
 
 void connect_or_exit_w_err(ssh_session session) {
@@ -56,70 +72,57 @@ void connect_or_exit_w_err(ssh_session session) {
   }
 }
 
-char* hexbuf2emoji_old(unsigned char *hash, size_t hash_len) {
-  /* (space btwn each emoji) + (emoji are 4 wide) + (terminator \0) */ 
-  char *outstring = malloc((sizeof(char)*hash_len) + (sizeof(char)*hash_len*4) +1); 
-  unsigned int hashbyte;
-  char emojibyte[4];
-  int inctr=0, outctr=0, emoctr=0;
-  for (inctr=0; inctr<hash_len; inctr++) {
-    outctr = inctr*5;
-
-    hashbyte = (unsigned int)hash[inctr];
-    if (! (255 >= hashbyte >= 0)) {
-      fprintf(stderr, 
-              "Error: the hash buffer has a byte in it not between 0 and 256.");
-      exit(-1);
+char* concat_bytearray(char *s1, char *s2) {
+    size_t len1 = strlen(s1);
+    size_t len2 = strlen(s2);
+    size_t outsz = len1+len2+1; // +1 for \0
+    char *result = malloc(outsz); 
+    if (!result) {
+      fprintf(stderr, "Error allocating memory of size %zi\n", outsz);
     }
 
-    emojibyte[0] = emoji_map[hashbyte];
-    emojibyte[1] = emoji_map[hashbyte+1];
-    emojibyte[2] = emoji_map[hashbyte+2];
-    emojibyte[3] = emoji_map[hashbyte+3];
-    printf("%s", emojibyte);
-
-    outstring[outctr] = emoji_map[hashbyte];
-    outstring[outctr+1] = emoji_map[hashbyte+1];
-    outstring[outctr+2] = emoji_map[hashbyte+2];
-    outstring[outctr+3] = emoji_map[hashbyte+3];
-    outstring[outctr+4] = (char)32;
-    //    dbgprintf("emojibyte == '%c'\n", emojibyte);
-    //dbgprintf("hashbyte %s(%i) == emojibyte %s\n", (char)hashbyte, hashbyte, emojibyte);
-    //dbgprintf("hashbyte %s", (hashbyte);
-    //outstring[outctr] = emojibyte;
-    //outstring[++outctr] = " ";
-  }
-  return outstring; 
-  /* TODO: how to free this memory? */
+    memcpy(result, s1, len1);
+    memcpy(result+len1, s2, len2+1); //+1 for \0
+    return result;
+  // TODO: how to free this memory? 
 }
-wchar_t* hexbuf2emoji(unsigned char *hash, size_t hash_len) {
-  wchar_t outstring[hash_len];
+
+char *hexbuf2emoji(unsigned char *hash, size_t hash_len) {
+  char *emojibyterep;
+  int inctr, outstring_len=0;
   unsigned int hashbyte;
-  wchar_t emojibyte;
-  int inctr=0;
+  char *os="";
+
   for (inctr=0; inctr<hash_len; inctr++) {
     hashbyte = (unsigned int)hash[inctr];
+    emojibyterep = (char *)emoji_map[hashbyte];
 
-    emojibyte = emoji_map[hashbyte];
-    printf("%ls", &emojibyte);
+    os = concat_bytearray(os, emojibyterep);
 
-    outstring[inctr] = emojibyte;
+    // Add a space between each emoji b/c they will overlap otherwise
+    // Add a colon after each emoji except the last one
+    if (inctr != hash_len-1) {
+      os = concat_bytearray(os, " :");
+    }
+    else {
+      os = concat_bytearray(os, " ");
+    }
   }
-  return outstring; 
-  /* TODO: how to free this memory? */
+  return os; 
+  // TODO: how to free this memory? 
 }
 
 void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
   char *os;
-  switch (displaymode) {
+  switch (mapping) {
     case HEX:
       os = ssh_get_hexa(hash, hash_len); break;
     case EMOJI:
       os = hexbuf2emoji(hash, hash_len); break;
     default:
       fprintf(stderr, 
-              "displaymode is set to %i but I can't tell what that means ",
-              displaymode);
+              "ERROR: mapping is set to %i but I can't tell what that means.\n",
+              mapping);
   }
   *outstring = os;
   /* TODO: free the 'os' memory how? */
@@ -246,38 +249,7 @@ int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, 
   return 0;
 }
 
-void usage() {
-  printf("Usage: %s [-h hostname] [-p port]\n", argv0);
-}
-
-int main(int argc, char *argv[]) {
-  char *dm_str;
-
-  argv0 = argv[0];
-  DEBUGMODE = 0;
-  dm_str = "hex";
-  char *hostname = "localhost";
-  char *port = "22";
-
-  int opt;
-  while ((opt = getopt(argc, argv, "h:p:d:D")) != -1) {
-    switch (opt) {
-      case 'h': hostname = optarg; break;
-      case 'p': port = optarg; break;
-      case 'd': dm_str = optarg; break;
-      case 'D': DEBUGMODE = 1; break;
-
-      case '?':
-      default:
-        usage();
-        exit(-1);
-    }
-  }
-  argc -= optind;
-  argv += optind;
-
-  displaymode = a2dmode(dm_str);
-
+int do_ssh_action(char *hostname, char *port) {
   int hk_len = 3;
   unsigned char *hostkeytypes[hk_len];
   hostkeytypes[0] = (unsigned char *)"ecdsa-sha2-nistp256";
@@ -302,5 +274,81 @@ int main(int argc, char *argv[]) {
   get_host_key_fingerprint(session, hostkeytypes, hostkeys, hk_len);
 
   return 0;
+}
+
+int do_map_action() {
+  int ctr;
+  switch (mapping) {
+    case HEX:
+      printf("HEX mapping:\nThis should be self-explanatory, man.\n"); break;
+    case EMOJI:
+      printf("EMOJI mapping: \n");
+      for (ctr=0; ctr<emoji_map_len; ctr++){
+        printf("%s , ", emoji_map[ctr]);
+      }
+      printf("\n");
+      break;
+    default:
+      fprintf(stderr, 
+              "ERROR: mapping is set to %i but I can't tell what that means.\n",
+              mapping);
+  }
+  /* TODO: free the 'os' memory how? */
+  return 0;
+}
+
+void emossh_help() {
+  printf("%s: experiments in SSH key fingerprint display.\n", argv0);
+  printf("    Arguments: \n");
+  printf("    -h HOSTNAME. Defaults to localhost.\n");
+  printf("    -p PORTNUM. Defaults to 22\n");
+  printf("    -m MAPPING. Possible values: hex (default), emoji.\n");
+  printf("    -a ACTION. Possible values: ssh (default), map.\n");
+  printf("        ssh: connect to an ssh server.\n");
+  printf("        map: display the mapping specified by -m.\n");
+  printf("    -D: enable debug mode.\n");
+}
+
+int main(int argc, char *argv[]) {
+  char *map_str, *action_str;
+
+  argv0 = argv[0];
+  DEBUGMODE = 0;
+  map_str = "hex";
+  action_str = "ssh";
+  char *hostname = "localhost";
+  char *port = "22";
+
+  int opt;
+  while ((opt = getopt(argc, argv, "h:p:m:a:D")) != -1) {
+    switch (opt) {
+      case 'h': hostname = optarg; break;
+      case 'p': port = optarg; break;
+      case 'm': map_str = optarg; break;
+      case 'a': action_str = optarg; break;
+      case 'D': DEBUGMODE = 1; break;
+
+      case '?':
+      default:
+        emossh_help();
+        exit(-1);
+    }
+  }
+  argc -= optind;
+  argv += optind;
+
+  mapping = a2mapping_t(map_str);
+  action = a2action_t(action_str);
+
+  switch (action) {
+    case SSH:
+      return do_ssh_action(hostname, port); break;
+    case MAP:
+      return do_map_action(); break;
+    default:
+      fprintf(stderr, 
+              "action is set to %i but I can't tell what that means ",
+              action);
+  }
 }
 

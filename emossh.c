@@ -6,9 +6,9 @@
 #include <libssh/libssh.h>
 
 #include "bytemaps.h"
+#include "util.h"
 
 char *argv0;
-
 int DEBUGMODE;
 
 void dbgprintf(const char *format, ...) {
@@ -72,53 +72,13 @@ void connect_or_exit_w_err(ssh_session session) {
   }
 }
 
-char* concat_bytearray(char *s1, char *s2) {
-    size_t len1 = strlen(s1);
-    size_t len2 = strlen(s2);
-    size_t outsz = len1+len2+1; // +1 for \0
-    char *result = malloc(outsz); 
-    if (!result) {
-      fprintf(stderr, "Error allocating memory of size %zi\n", outsz);
-    }
-
-    memcpy(result, s1, len1);
-    memcpy(result+len1, s2, len2+1); //+1 for \0
-    return result;
-  // TODO: how to free this memory? 
-}
-
-char *hexbuf2emoji(unsigned char *hash, size_t hash_len) {
-  char *emojibyterep;
-  int inctr, outstring_len=0;
-  unsigned int hashbyte;
-  char *os="";
-
-  for (inctr=0; inctr<hash_len; inctr++) {
-    hashbyte = (unsigned int)hash[inctr];
-    emojibyterep = (char *)emoji_map[hashbyte];
-
-    os = concat_bytearray(os, emojibyterep);
-
-    // Add a space between each emoji b/c they will overlap otherwise
-    // Add a colon after each emoji except the last one
-    if (inctr != hash_len-1) {
-      os = concat_bytearray(os, " :");
-    }
-    else {
-      os = concat_bytearray(os, " ");
-    }
-  }
-  return os; 
-  // TODO: how to free this memory? 
-}
-
 void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
   char *os;
   switch (mapping) {
     case HEX:
       os = ssh_get_hexa(hash, hash_len); break;
     case EMOJI:
-      os = hexbuf2emoji(hash, hash_len); break;
+      os = map_hexbuf_to_emoji(hash, hash_len); break;
     default:
       fprintf(stderr, 
               "ERROR: mapping is set to %i but I can't tell what that means.\n",

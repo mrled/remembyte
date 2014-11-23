@@ -2,8 +2,7 @@
 #include "bytemaps.h"
 #include "util.h"
 
-const int emoji_map_len = 256;
-const char *emoji_map[] = {
+const char *emoji_map[EMOJI_MAP_LEN] = {
     "🌀", "🌂", "🌅", "🌈", "🌙", "🌞", "🌟", "🌠",
     "🌰", "🌱", "🌲", "🌳", "🌴", "🌵", "🌷", "🌸",
     "🌹", "🌺", "🌻", "🌼", "🌽", "🌾", "🌿", "🍀",
@@ -38,8 +37,7 @@ const char *emoji_map[] = {
     "👾", "👿", "💀", "💁", "💂", "💃", "💄", "💅"
 };
 
-const int pgp_wordlist_two_len = 256;
-const char *pgp_wordlist_two[] = {
+const char *pgp_wordlist_two[PGP_WORDLIST_TWO_LEN] = {
   "aardvark", "absurd", "accrue", "acme",
   "adrift", "adult", "afflict", "ahead",
   "aimless", "Algol", "allow", "alone",
@@ -106,8 +104,7 @@ const char *pgp_wordlist_two[] = {
   "wayside", "willow", "woodlark", "Zulu"
 };
 
-const int pgp_wordlist_three_len = 256;
-const char *pgp_wordlist_three[] = {
+const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN] = {
   "adroitness", "adviser", "aggregate", "alkali",
   "almighty", "amulet", "amusement", "antenna",
   "applicant", "Apollo", "armistice", "article",

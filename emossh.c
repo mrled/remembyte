@@ -243,7 +243,7 @@ int do_map_action() {
       printf("HEX mapping:\nThis should be self-explanatory, man.\n"); break;
     case EMOJI:
       printf("EMOJI mapping: \n");
-      for (ctr=0; ctr<emoji_map_len; ctr++){
+      for (ctr=0; ctr<EMOJI_MAP_LEN; ctr++){
         printf("%s , ", emoji_map[ctr]);
       }
       printf("\n");

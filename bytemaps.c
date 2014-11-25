@@ -1,6 +1,4 @@
-#include <stdlib.h>
 #include "bytemaps.h"
-#include "util.h"
 
 const char *emoji_map[EMOJI_MAP_LEN] = {
     "🌀", "🌂", "🌅", "🌈", "🌙", "🌞", "🌟", "🌠",
@@ -171,6 +169,38 @@ const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN] = {
   "Wilmington", "Wyoming", "yesteryear", "Yucatan"
 };
 
+
+mapping_t a2mapping_t(char *map_name) {
+  mapping_t map;
+  if (strlen(map_name) >=3 && strncmp(map_name, "hex", 1) == 0) {
+    map = HEX;
+  }
+  else if (strlen(map_name) >=5 && strncmp(map_name, "emoji", 1) == 0) {
+    map = EMOJI;
+  }
+  else {
+    fprintf(stderr, "No such bytemap: %s\n", map_name);
+    exit(-1);
+  }
+  return map;
+}
+
+void get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping, char **outstring) {
+  char *os;
+  switch (mapping) {
+    case HEX:
+      os = ssh_get_hexa(hash, hash_len); break;
+    case EMOJI:
+      os = map_hexbuf_to_emoji(hash, hash_len); break;
+    default:
+      fprintf(stderr, 
+              "ERROR: mapping is set to %i but I can't tell what that means.\n",
+              mapping);
+      os = ""; break;
+  }
+  *outstring = os;
+  /* TODO: free the 'os' memory how? */
+}
 
 char *map_hexbuf_to_emoji(unsigned char *hash, size_t hash_len) {
   char *emojibyterep;

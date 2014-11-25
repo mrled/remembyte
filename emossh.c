@@ -1,12 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-
-#include <libssh/libssh.h>
-
-#include "bytemaps.h"
-#include "util.h"
+#include "emossh.h"
 
 char *argv0;
 int DEBUGMODE;
@@ -20,11 +12,11 @@ void dbgprintf(const char *format, ...) {
   }
 }
 
+/*
 typedef enum {
   HEX,
   EMOJI
 } mapping_t;
-mapping_t mapping;
 mapping_t a2mapping_t(char *map_name) {
   mapping_t map;
   if (strlen(map_name) >=3 && strncmp(map_name, "hex", 1) == 0) {
@@ -39,6 +31,9 @@ mapping_t a2mapping_t(char *map_name) {
   }
   return map;
 }
+*/
+mapping_t mapping;
+
 
 typedef enum {
   SSH,
@@ -60,168 +55,9 @@ action_t a2action_t(char *action_name) {
   return act;
 }
 
-void connect_or_exit_w_err(ssh_session session) {
-  if (ssh_connect(session) != SSH_OK) {
-    char *hostname; 
-    unsigned int port;
-    ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
-    ssh_options_get_port(session, &port);
-    fprintf(stderr, "Error connecting to %s:%u - %s\n",
-      hostname, port, ssh_get_error(session));
-    exit(-1);
-  }
-}
-
-void get_display_hash(unsigned char *hash, size_t hash_len, char **outstring) {
-  char *os;
-  switch (mapping) {
-    case HEX:
-      os = ssh_get_hexa(hash, hash_len); break;
-    case EMOJI:
-      os = map_hexbuf_to_emoji(hash, hash_len); break;
-    default:
-      fprintf(stderr, 
-              "ERROR: mapping is set to %i but I can't tell what that means.\n",
-              mapping);
-  }
-  *outstring = os;
-  /* TODO: free the 'os' memory how? */
-}
-
-int get_banners(ssh_session session) {
-  const char *sbanner, *dmessage;
-  char *issue, *cbanner;
-  int osshv;
-
-  connect_or_exit_w_err(session);
-
-  /* TODO: why doesn't ssh_get_issue_banner work? 
-   * I can set a banner that openssh will display but this won't.
-   */
-  issue = ssh_get_issue_banner(session);
-  if (issue) {
-    printf("Issue banner:\n%s\n", issue);
-  }
-  else {
-    printf("No issue banner.\n");
-  }
-
-  sbanner = ssh_get_serverbanner(session);
-  if (sbanner) {
-    printf("Server banner: %s.\n", sbanner);
-  }
-  else {
-    printf("No server banner.\n");
-  }
-
- 
-  /* TODO: parse OpenSSH version so it returns the real version.
-   * I have no idea what this value is returning??
-   */
-  osshv = ssh_get_openssh_version(session);
-  if (osshv) {
-    printf("OpenSSH version: %i.\n", osshv);
-  }
-  else {
-    printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
-  }
-
-  /* This does not actually initiate a disconnect.*/
-  dmessage = ssh_get_disconnect_message(session);
-  if (dmessage) {
-    printf("Disconnect message: %s.\n", dmessage);
-  }
-  else {
-    printf("No disconnect message.\n");
-  }
-
-  ssh_disconnect(session);
-  return 0;
-}
-
-int get_host_key_fingerprint(ssh_session session, unsigned char **hostkeytypes, unsigned char **hostkeys, int hk_len) {
-
-  size_t hkhash_buf_len;
-  ssh_key pubkey;
-  char *hexa;
-  int i;
-
-  unsigned char *hkhash_buf;
-  unsigned char *hkhash_display;
-
-  unsigned char *hkhash;
-
-  char *hostname; 
-  unsigned int port;
-  ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
-  ssh_options_get_port(session, &port);
-
-  int *blockarray;
-  double blockarray_len;
-
-  for (i=0; i<hk_len; i++) {
-    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeytypes[i]) != 0) {
-      fprintf(stderr, "Error setting SSH option for host key '%s': %s\n", hostkeytypes[i], ssh_get_error(session));
-      return -1;
-    }
-
-    if (ssh_connect(session) != SSH_OK) {
-      printf("Server does not support key of type %s.\n", hostkeytypes[i]);
-    }
-
-    else {
-
-      if (ssh_get_publickey(session, &pubkey) != SSH_OK) {
-        fprintf(stderr, "Error getting public key: %s\n", ssh_get_error(session));
-        return -1;
-      }
-
-      /* The third ("hash") argument to ssh_get_publickey_hash comes back as a 
-       * character buffer of hex values. However, it's padded with zeroes. 
-
-         (lldb) frame variable hash
-         (unsigned char *) hostkey = 0x000000000119c860 "\x81\x0f\x13)\xab\xf2\xb4g\xd0\x13\x89w\x96]o\x01XXXXXXXX1"
-         (lldb) frame variable ssh_get_hexa(hash, hash_len) // this is lldb pseudocode, of course
-         (char *) hexa = 0x000000000119db70 "81:0f:13:29:ab:f2:b4:67:d0:13:89:77:96:5d:6f:01"
-
-       */
-      //if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys[i], &hlen) != 0) {
-      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, &hkhash_buf_len) != 0) {
-        fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
-        return -1;
-      }
-
-      hostkeys[i] = hkhash_buf;
-
-      char *display;
-      get_display_hash(hkhash_buf, hkhash_buf_len, &display);
-
-      printf("%s (%s)\n", display, hostkeytypes[i]);
-
-    }
-
-    ssh_disconnect(session);
-
-  }
-
-  ssh_key_free(pubkey);
-
-  return 0;
-}
-
 int do_ssh_action(char *hostname, char *port) {
-  int hk_len = 3;
-  unsigned char *hostkeytypes[hk_len];
-  hostkeytypes[0] = (unsigned char *)"ecdsa-sha2-nistp256";
-  hostkeytypes[1] = (unsigned char *)"ssh-dss"; 
-  hostkeytypes[2] = (unsigned char *)"ssh-rsa";
-
-  unsigned char *hostkeys[hk_len];
-  int i;
-  for (i=0; i<hk_len; i++) {
-    /* hex representations of MD5 hashes are 32 characters */
-    hostkeys[i] = malloc(32*sizeof(unsigned char));
-  }
+  ssh_hostkeys hostkeys = ssh_hostkeys_new();
+  ssh_banners banners;
 
   ssh_session session;
   session = ssh_new();
@@ -230,8 +66,19 @@ int do_ssh_action(char *hostname, char *port) {
   ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
   ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
 
-  get_banners(session);
-  get_host_key_fingerprint(session, hostkeytypes, hostkeys, hk_len);
+  // Test the connection & exit if it fails:
+  if (ssh_connect(session) != SSH_OK) {
+    fprintf(stderr, "Error connecting to %s:%s - %s\n",
+      hostname, port, ssh_get_error(session));
+    exit(-1);
+  }
+  ssh_disconnect(session);
+
+  // TODO: do return checking here?
+  get_banners(session, banners);
+  print_banners(banners);
+  get_hostkey_fingerprint(session, hostkeys);
+  print_hostkey_fingerprint(hostkeys, mapping);
 
   return 0;
 }
@@ -259,14 +106,15 @@ int do_map_action() {
 
 void emossh_help() {
   printf("%s: experiments in SSH key fingerprint display.\n", argv0);
-  printf("    Arguments: \n");
-  printf("    -h HOSTNAME. Defaults to localhost.\n");
-  printf("    -p PORTNUM. Defaults to 22\n");
+  printf("%s [-maDh] [HOSTNAME [PORT]]\n", argv0);
+  printf("    HOSTNAME: the host to connect to. Defaults to localhost.\n");
+  printf("    PORT: the port to connect to. Defaults to 22.\n");
   printf("    -m MAPPING. Possible values: hex (default), emoji.\n");
   printf("    -a ACTION. Possible values: ssh (default), map.\n");
   printf("        ssh: connect to an ssh server.\n");
   printf("        map: display the mapping specified by -m.\n");
   printf("    -D: enable debug mode.\n");
+  printf("    -h: display this message.\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -276,19 +124,16 @@ int main(int argc, char *argv[]) {
   DEBUGMODE = 0;
   map_str = "hex";
   action_str = "ssh";
-  char *hostname = "localhost";
-  char *port = "22";
+  char *hostname, *port;
 
   int opt;
-  while ((opt = getopt(argc, argv, "h:p:m:a:D")) != -1) {
+  while ((opt = getopt(argc, argv, "m:a:Dh")) != -1) {
     switch (opt) {
-      case 'h': hostname = optarg; break;
-      case 'p': port = optarg; break;
       case 'm': map_str = optarg; break;
       case 'a': action_str = optarg; break;
       case 'D': DEBUGMODE = 1; break;
 
-      case '?':
+      case 'h':
       default:
         emossh_help();
         exit(-1);
@@ -296,6 +141,28 @@ int main(int argc, char *argv[]) {
   }
   argc -= optind;
   argv += optind;
+
+  dbgprintf("argc = %i, optind = %i\n", argc, optind);
+
+  hostname = "localhost"; 
+  port = "22";
+
+  optind = 0; 
+  if (argc > optind) {
+    hostname = argv[optind];
+    optind++;
+  }
+  if (argc > optind) {
+    port = argv[optind];
+    optind++;
+  }
+  if (argc > optind) {
+    fprintf(stderr, "ERROR: too many positional arguments.\n");
+    emossh_help();
+    exit(-1);
+  }
+
+  dbgprintf("Using hostname '%s' and port '%s'\n", hostname, port);
 
   mapping = a2mapping_t(map_str);
   action = a2action_t(action_str);

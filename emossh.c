@@ -75,9 +75,12 @@ int do_ssh_action(char *hostname, char *port) {
   ssh_disconnect(session);
 
   // TODO: do return checking here?
-  get_banners(session, banners);
+  if (get_banners(session, &banners) != 0) {
+    fprintf(stderr, "Error getting banners.\n");
+    exit(-1);
+  }
   print_banners(banners);
-  get_hostkey_fingerprint(session, hostkeys);
+  get_hostkey_fingerprint(session, &hostkeys);
   print_hostkey_fingerprint(hostkeys, mapping);
 
   return 0;

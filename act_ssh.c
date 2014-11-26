@@ -21,7 +21,7 @@ ssh_hostkeys ssh_hostkeys_new() {
  * @param banners an ssh_banners pointer (defined in the header).
  * @return -1 for failures, 0 for successes
  */
-int get_banners(ssh_session session, ssh_banners banners) {
+int get_banners(ssh_session session, ssh_banners *banners) {
   if (ssh_connect(session) != SSH_OK) {
     char *hostname; 
     unsigned int port;
@@ -35,16 +35,20 @@ int get_banners(ssh_session session, ssh_banners banners) {
   /* TODO: why doesn't ssh_get_issue_banner work? 
    * I can set a banner that openssh will display but this won't.
    */
-  banners.issue_banner = ssh_get_issue_banner(session);
-  banners.server_banner = ssh_get_serverbanner(session);
+  //banners.issue_banner = ssh_get_issue_banner(session);
+  //banners.server_banner = ssh_get_serverbanner(session);
+  banners->issue_banner = ssh_get_issue_banner(session);
+  banners->server_banner = ssh_get_serverbanner(session);
 
   /* TODO: parse OpenSSH version so it returns the real version.
    * I have no idea what this value is returning??
    */
-  banners.openssh_version = ssh_get_openssh_version(session);
+  //banners.openssh_version = ssh_get_openssh_version(session);
+  banners->openssh_version = ssh_get_openssh_version(session);
 
   /* This does not actually initiate a disconnect.*/
-  banners.disconnect_message = ssh_get_disconnect_message(session);
+  //banners.disconnect_message = ssh_get_disconnect_message(session);
+  banners->disconnect_message = ssh_get_disconnect_message(session);
 
   ssh_disconnect(session);
   return 0;
@@ -58,7 +62,7 @@ void print_banners(ssh_banners banners) {
     printf("No issue banner.\n");
   }
 
-  if (banners.server_banner) {
+  if (banners.server_banner && strlen(banners.server_banner) >0) {
     printf("Server banner: %s.\n", banners.server_banner);
   }
   else {
@@ -87,7 +91,7 @@ void print_banners(ssh_banners banners) {
  * @param hostkeys an ssh_hostkeys pointer (defined in the header).
  * @return -1 for failures, 0 for successes
  */
-int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys hostkeys) {
+int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
 
   int kctr;
   ssh_key pubkey;
@@ -102,16 +106,20 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys hostkeys) {
   unsigned char *hkhash;
 */
 
-  for (kctr=0; kctr<hostkeys.count; kctr++) {
-    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys.keytypes[kctr]) != 0) {
+//  for (kctr=0; kctr<hostkeys.count; kctr++) {
+  for (kctr=0; kctr < hostkeys->count; kctr++) {
+//    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys.keytypes[kctr]) != 0) {
+    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys->keytypes[kctr]) != 0) {
       fprintf(stderr, "Error setting SSH option for host key '%s': %s\n", 
-        hostkeys.keytypes[kctr], ssh_get_error(session));
+//        hostkeys.keytypes[kctr], ssh_get_error(session));
+        hostkeys->keytypes[kctr], ssh_get_error(session));
       return -1;
     }
 
     if (ssh_connect(session) != SSH_OK) {
       // The server does not support the host key type.
-      hostkeys.keyvalues[kctr] = (unsigned char*)"";
+//      hostkeys.keyvalues[kctr] = (unsigned char*)"";
+      hostkeys->keyvalues[kctr] = (unsigned char*)"";
     }
 
     else {
@@ -129,8 +137,8 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys hostkeys) {
          (lldb) frame variable ssh_get_hexa(hash, hash_len) // this is lldb pseudocode, of course
          (char *) hexa = 0x000000000119db70 "81:0f:13:29:ab:f2:b4:67:d0:13:89:77:96:5d:6f:01"
        */
-      //if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, &hkhash_buf_len) != 0) {
-      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys.keyvalues[kctr], &hostkeys.keylengths[kctr]) != 0) {
+//      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys.keyvalues[kctr], &hostkeys.keylengths[kctr]) != 0) {
+      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys->keyvalues[kctr], &hostkeys->keylengths[kctr]) != 0) {
         fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
         return -1;
       }

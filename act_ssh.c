@@ -46,30 +46,30 @@ int get_banners(ssh_session session, ssh_banners *banners) {
   return 0;
 }
 
-void print_banners(ssh_banners banners) {
-  if (banners.issue_banner) {
-    printf("Issue banner:\n%s\n", banners.issue_banner);
+void print_banners(ssh_banners *banners) {
+  if (banners->issue_banner) {
+    printf("Issue banner:\n%s\n", banners->issue_banner);
   }
   else {
     printf("No issue banner.\n");
   }
 
-  if (banners.server_banner && strlen(banners.server_banner) >0) {
-    printf("Server banner: %s.\n", banners.server_banner);
+  if (banners->server_banner && strlen(banners->server_banner) >0) {
+    printf("Server banner: %s.\n", banners->server_banner);
   }
   else {
     printf("No server banner.\n");
   }
 
-  if (banners.openssh_version) {
-    printf("OpenSSH version: %i.\n", banners.openssh_version);
+  if (banners->openssh_version) {
+    printf("OpenSSH version: %i.\n", banners->openssh_version);
   }
   else {
     printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
   }
 
-  if (banners.disconnect_message) {
-    printf("Disconnect message: %s.\n", banners.disconnect_message);
+  if (banners->disconnect_message) {
+    printf("Disconnect message: %s.\n", banners->disconnect_message);
   }
   else {
     printf("No disconnect message.\n");

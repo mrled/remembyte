@@ -58,7 +58,7 @@ int do_ssh_action(char *hostname, char *port) {
     fprintf(stderr, "Error getting banners.\n");
     exit(-1);
   }
-  print_banners(banners);
+  print_banners(&banners);
 
   if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
     fprintf(stderr, "Error getting hostkey fingerprints.\n");

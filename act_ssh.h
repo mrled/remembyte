@@ -34,7 +34,7 @@ typedef struct _ssh_hostkeys ssh_hostkeys;
 ssh_hostkeys ssh_hostkeys_new();
 
 int get_banners(ssh_session, ssh_banners*);
-void print_banners(ssh_banners);
+void print_banners(ssh_banners*);
 
 int get_hostkey_fingerprint(ssh_session, ssh_hostkeys*);
 void print_hostkey_fingerprint(ssh_hostkeys*, mapping_t);

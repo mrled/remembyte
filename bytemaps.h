@@ -20,7 +20,8 @@ const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN];
 
 typedef enum {
   HEX,
-  EMOJI
+  EMOJI,
+  PGP
 } mapping_t;
 mapping_t a2mapping_t(char *);
 
@@ -28,5 +29,6 @@ void get_display_hash(unsigned char *, size_t, mapping_t, char **);
 
 char *buf2emoji(unsigned char *, size_t);
 char *buf2hex(unsigned char *, size_t);
+char *buf2pgp(unsigned char *, size_t);
 
 #endif

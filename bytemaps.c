@@ -172,11 +172,14 @@ const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN] = {
 
 mapping_t a2mapping_t(char *map_name) {
   mapping_t map;
-  if (strlen(map_name) >=3 && strncmp(map_name, "hex", 1) == 0) {
+  if (strlen(map_name) >=3 && strncmp(map_name, "hex", 3) == 0) {
     map = HEX;
   }
-  else if (strlen(map_name) >=5 && strncmp(map_name, "emoji", 1) == 0) {
+  else if (strlen(map_name) >=5 && strncmp(map_name, "emoji", 3) == 0) {
     map = EMOJI;
+  }
+  else if (strlen(map_name) >=3 && strncmp(map_name, "pgp", 3) == 0) {
+    map = PGP;
   }
   else {
     fprintf(stderr, "No such bytemap: %s\n", map_name);
@@ -192,6 +195,8 @@ void get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping, c
       os = buf2hex(hash, hash_len); break;
     case EMOJI:
       os = buf2emoji(hash, hash_len); break;
+    case PGP:
+      os = buf2pgp(hash, hash_len); break;
     default:
       fprintf(stderr, 
               "ERROR: mapping is set to %i but I can't tell what that means.\n",
@@ -260,5 +265,31 @@ char *buf2emoji(unsigned char *buffer, size_t buflen) {
   }
   return os; 
   // TODO: how to free this memory? 
+}
+
+char *buf2pgp(unsigned char *buffer, size_t buflen) {
+  char *pgpbyterep;
+  int ctr;
+  unsigned int singlebyte;
+
+  char *os="";
+
+  for (ctr=0; ctr<buflen; ctr++) {
+    singlebyte = (unsigned int)buffer[ctr];
+
+    if (ctr%2 == 0) {
+      pgpbyterep = (char*) pgp_wordlist_two[singlebyte];
+    }
+    else {
+      pgpbyterep = (char*) pgp_wordlist_three[singlebyte];
+    }
+    
+    os = concat_bytearray(os, pgpbyterep);
+    if (ctr != buflen-1) {
+      os = concat_bytearray(os, ", ");
+    }
+  }
+  return os;
+  //TODO: how to free this memory?
 }
 

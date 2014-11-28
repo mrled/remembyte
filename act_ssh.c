@@ -3,13 +3,9 @@
 ssh_hostkeys ssh_hostkeys_new() {
   ssh_hostkeys hk;
   hk.count = HOSTKEY_COUNT;
-//  hk.keytypes = {
-//    "ecdsa-sha2-nistp256", "ssh-dss", "ssh-rsa"
-//  }
   hk.keytypes[0] = "ecdsa-sha2-nistp256";
   hk.keytypes[1] = "ssh-dss";
   hk.keytypes[2] = "ssh-rsa";
-
   hk.keylengths[hk.count] = 0;
   return hk;
 }
@@ -18,7 +14,7 @@ ssh_hostkeys ssh_hostkeys_new() {
  * Get banners and version information for an SSH server
  * 
  * @param session an ssh_session pointer (from libssh), in a disconnected state.
- * @param banners an ssh_banners pointer (defined in the header).
+ * @param banners pointer to an ssh_banners struct (defined in the header).
  * @return -1 for failures, 0 for successes
  */
 int get_banners(ssh_session session, ssh_banners *banners) {
@@ -35,19 +31,15 @@ int get_banners(ssh_session session, ssh_banners *banners) {
   /* TODO: why doesn't ssh_get_issue_banner work? 
    * I can set a banner that openssh will display but this won't.
    */
-  //banners.issue_banner = ssh_get_issue_banner(session);
-  //banners.server_banner = ssh_get_serverbanner(session);
   banners->issue_banner = ssh_get_issue_banner(session);
   banners->server_banner = ssh_get_serverbanner(session);
 
   /* TODO: parse OpenSSH version so it returns the real version.
    * I have no idea what this value is returning??
    */
-  //banners.openssh_version = ssh_get_openssh_version(session);
   banners->openssh_version = ssh_get_openssh_version(session);
 
   /* This does not actually initiate a disconnect.*/
-  //banners.disconnect_message = ssh_get_disconnect_message(session);
   banners->disconnect_message = ssh_get_disconnect_message(session);
 
   ssh_disconnect(session);
@@ -88,7 +80,7 @@ void print_banners(ssh_banners banners) {
  * Get host keys for an SSH server
  * 
  * @param session an ssh_session pointer (from libssh), in a disconnected state.
- * @param hostkeys an ssh_hostkeys pointer (defined in the header).
+ * @param hostkeys a pointer to an ssh_hostkeys struct (defined in the header).
  * @return -1 for failures, 0 for successes
  */
 int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
@@ -98,28 +90,18 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
 
   size_t hkhash_buf_len;
   unsigned char *hkhash_buf;
-/*
-  char *hexa;
 
-  unsigned char *hkhash_display;
-
-  unsigned char *hkhash;
-*/
-
-//  for (kctr=0; kctr<hostkeys.count; kctr++) {
   for (kctr=0; kctr < hostkeys->count; kctr++) {
-//    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys.keytypes[kctr]) != 0) {
     if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys->keytypes[kctr]) != 0) {
       fprintf(stderr, "Error setting SSH option for host key '%s': %s\n", 
-//        hostkeys.keytypes[kctr], ssh_get_error(session));
         hostkeys->keytypes[kctr], ssh_get_error(session));
       return -1;
     }
 
     if (ssh_connect(session) != SSH_OK) {
       // The server does not support the host key type.
-//      hostkeys.keyvalues[kctr] = (unsigned char*)"";
       hostkeys->keyvalues[kctr] = (unsigned char*)"";
+      hostkeys->keylengths[kctr] = 0;
     }
 
     else {
@@ -137,13 +119,12 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
          (lldb) frame variable ssh_get_hexa(hash, hash_len) // this is lldb pseudocode, of course
          (char *) hexa = 0x000000000119db70 "81:0f:13:29:ab:f2:b4:67:d0:13:89:77:96:5d:6f:01"
        */
-//      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys.keyvalues[kctr], &hostkeys.keylengths[kctr]) != 0) {
-      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hostkeys->keyvalues[kctr], &hostkeys->keylengths[kctr]) != 0) {
+      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, &hkhash_buf_len) != 0) {
         fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
         return -1;
       }
-
-      //printf("%s (%s)\n", display, hostkeytypes[i]);
+      hostkeys->keyvalues[kctr] = hkhash_buf;
+      hostkeys->keylengths[kctr] = hkhash_buf_len;
     }
     ssh_disconnect(session);
   }
@@ -152,12 +133,18 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
   return 0;
 }
 
-void print_hostkey_fingerprint(ssh_hostkeys hostkeys, mapping_t mapping) {
+void print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
   int kctr;
   char *display;
 
-  for (kctr=0; kctr<hostkeys.count; kctr++) {
-    get_display_hash(hostkeys.keyvalues[kctr], hostkeys.keylengths[kctr], mapping, &display);
-    printf("%s (%s)\n", display, hostkeys.keytypes[kctr]);
+  for (kctr=0; kctr< hostkeys->count; kctr++) {
+    if (hostkeys->keylengths[kctr]) {
+      get_display_hash(hostkeys->keyvalues[kctr], hostkeys->keylengths[kctr], mapping, &display);
+      printf("%s (%s)\n", display, hostkeys->keytypes[kctr]);
+    }
+    else {
+      printf("No key of type %s.\n", hostkeys->keytypes[kctr]);
+    }
   }
 }
+

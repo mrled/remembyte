@@ -26,6 +26,7 @@ mapping_t a2mapping_t(char *);
 
 void get_display_hash(unsigned char *, size_t, mapping_t, char **);
 
-char *map_hexbuf_to_emoji(unsigned char *, size_t);
+char *buf2emoji(unsigned char *, size_t);
+char *buf2hex(unsigned char *, size_t);
 
 #endif

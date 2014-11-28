@@ -12,28 +12,7 @@ void dbgprintf(const char *format, ...) {
   }
 }
 
-/*
-typedef enum {
-  HEX,
-  EMOJI
-} mapping_t;
-mapping_t a2mapping_t(char *map_name) {
-  mapping_t map;
-  if (strlen(map_name) >=3 && strncmp(map_name, "hex", 1) == 0) {
-    map = HEX;
-  }
-  else if (strlen(map_name) >=5 && strncmp(map_name, "emoji", 1) == 0) {
-    map = EMOJI;
-  }
-  else {
-    fprintf(stderr, "No such bytemap: %s\n", map_name);
-    exit(-1);
-  }
-  return map;
-}
-*/
 mapping_t mapping;
-
 
 typedef enum {
   SSH,
@@ -80,8 +59,12 @@ int do_ssh_action(char *hostname, char *port) {
     exit(-1);
   }
   print_banners(banners);
-  get_hostkey_fingerprint(session, &hostkeys);
-  print_hostkey_fingerprint(hostkeys, mapping);
+
+  if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
+    fprintf(stderr, "Error getting hostkey fingerprints.\n");
+    exit(-1);
+  }
+  print_hostkey_fingerprint(&hostkeys, mapping);
 
   return 0;
 }

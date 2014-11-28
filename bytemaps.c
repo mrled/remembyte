@@ -189,9 +189,9 @@ void get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping, c
   char *os;
   switch (mapping) {
     case HEX:
-      os = ssh_get_hexa(hash, hash_len); break;
+      os = buf2hex(hash, hash_len); break;
     case EMOJI:
-      os = map_hexbuf_to_emoji(hash, hash_len); break;
+      os = buf2emoji(hash, hash_len); break;
     default:
       fprintf(stderr, 
               "ERROR: mapping is set to %i but I can't tell what that means.\n",
@@ -202,21 +202,56 @@ void get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping, c
   /* TODO: free the 'os' memory how? */
 }
 
-char *map_hexbuf_to_emoji(unsigned char *hash, size_t hash_len) {
-  char *emojibyterep;
-  int inctr, outstring_len=0;
-  unsigned int hashbyte;
+/**
+ * Map the bytes in a buffer to hex values
+ * 
+ * @param buffer a buffer
+ * @param buflen the length of the buffer in bytes
+ * @return a string of hex digits seperated by colons such as 'a5:00:26:1e'
+ */
+char *buf2hex(unsigned char *buffer, size_t buflen) {
+  char hexbyterep[3];
+  int inctr;
+  unsigned int singlebyte;
   char *os="";
 
-  for (inctr=0; inctr<hash_len; inctr++) {
-    hashbyte = (unsigned int)hash[inctr];
-    emojibyterep = (char *)emoji_map[hashbyte];
+  for (inctr=0; inctr<buflen; inctr++) {
+    singlebyte = (unsigned int)buffer[inctr];
+    sprintf(hexbyterep, "%02x", buffer[inctr]);
+    os = concat_bytearray(os, hexbyterep);
+    if (inctr != buflen-1) {
+      os = concat_bytearray(os, ":");
+    }
+  }
+  return os;
+  //TODO: how to free this memory?
+}
+
+/**
+ * Map the bytes in a buffer to emoji
+ *
+ * The list of emoji was originally taken from 
+ * <http://www.windytan.com/2014/10/visualizing-hex-bytes-with-unicode-emoji.html>
+ * 
+ * @param buffer a buffer
+ * @param buflen the length of the buffer in bytes
+ * @return a string of emoji (punctuated by spaces and colons) that represents bytes in the buffer. in the form of '🐜 :🌀 :🍏 :🍇 '
+ */
+char *buf2emoji(unsigned char *buffer, size_t buflen) {
+  char *emojibyterep;
+  int inctr;
+  unsigned int singlebyte;
+  char *os="";
+
+  for (inctr=0; inctr<buflen; inctr++) {
+    singlebyte = (unsigned int)buffer[inctr];
+    emojibyterep = (char *)emoji_map[singlebyte];
 
     os = concat_bytearray(os, emojibyterep);
 
     // Add a space between each emoji b/c they will overlap otherwise
     // Add a colon after each emoji except the last one
-    if (inctr != hash_len-1) {
+    if (inctr != buflen-1) {
       os = concat_bytearray(os, " :");
     }
     else {

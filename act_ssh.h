@@ -26,6 +26,7 @@ struct _ssh_hostkeys {
   int count;
   char *keytypes[HOSTKEY_COUNT];
   unsigned char *keyvalues[HOSTKEY_COUNT];
+  //size_t keylengths[HOSTKEY_COUNT];
   size_t keylengths[];
 };
 typedef struct _ssh_hostkeys ssh_hostkeys;
@@ -36,6 +37,6 @@ int get_banners(ssh_session, ssh_banners*);
 void print_banners(ssh_banners);
 
 int get_hostkey_fingerprint(ssh_session, ssh_hostkeys*);
-void print_hostkey_fingerprint(ssh_hostkeys, mapping_t);
+void print_hostkey_fingerprint(ssh_hostkeys*, mapping_t);
 
 #endif

@@ -139,7 +139,7 @@ void print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
 
   for (kctr=0; kctr< hostkeys->count; kctr++) {
     if (hostkeys->keylengths[kctr]) {
-      get_display_hash(hostkeys->keyvalues[kctr], hostkeys->keylengths[kctr], mapping, &display);
+      display = get_display_hash(hostkeys->keyvalues[kctr], hostkeys->keylengths[kctr], mapping);
       printf("%s (%s)\n", display, hostkeys->keytypes[kctr]);
     }
     else {

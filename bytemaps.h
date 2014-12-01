@@ -25,7 +25,9 @@ typedef enum {
 } mapping_t;
 mapping_t a2mapping_t(char *);
 
-void get_display_hash(unsigned char *, size_t, mapping_t, char **);
+char *get_display_hash(unsigned char *, size_t, mapping_t);
+
+char *buf2map(unsigned char *, size_t, char *[], size_t, const char *, const char *);
 
 char *buf2emoji(unsigned char *, size_t);
 char *buf2hex(unsigned char *, size_t);

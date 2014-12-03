@@ -232,23 +232,13 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
   size_t maps_count;
   switch (mapping) {
     case HEX:
-      separator = ":";
-      terminator = "";
-      maps[0] = hex_map;
-      maps_count = 1;
+      return buf2map(hash, hash_len, ":", "", 1, &hex_map);
       break;
     case EMOJI:
-      separator = ": ";
-      terminator = " ";
-      maps[0] = emoji_map;
-      maps_count = 1;
+      return buf2map(hash, hash_len, ": ", " ", 1, &emoji_map);
       break;
     case PGP:
-      separator = ", ";
-      terminator = "";
-      maps[0] = pgp_wordlist_two;
-      maps[1] = pgp_wordlist_three;
-      maps_count = 2;
+      return buf2map(hash, hash_len, ", ", "", 2, &pgp_wordlist_two, &pgp_wordlist_three);
       break;
     default:
       fprintf(stderr, 
@@ -256,199 +246,9 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
               mapping);
       exit(-1);
   }
-  return buf2map(hash, hash_len, maps, maps_count, separator, terminator);
   // NOTE: Caller must free the returned pointer
 }
 
-/**
- * Map the bytes in a buffer to hex values
- * 
- * @param buffer a buffer
- * @param buflen the length of the buffer in bytes
- * @return a string of hex digits seperated by colons such as 'a5:00:26:1e'
- */
-/*
-char *buf2hex(unsigned char *buffer, size_t buflen) {
-  char hexbyterep[3];
-  int inctr;
-  unsigned int singlebyte;
-  char *os="";
-
-  for (inctr=0; inctr<buflen; inctr++) {
-    singlebyte = (unsigned int)buffer[inctr];
-    sprintf(hexbyterep, "%02x", buffer[inctr]);
-    os = concat_bytearray(os, hexbyterep);
-    if (inctr != buflen-1) {
-      os = concat_bytearray(os, ":");
-    }
-  }
-  return os;
-  //TODO: how to free this memory?
-}
-*/
-
-/**
- * Map the bytes in a buffer to emoji
- *
- * The list of emoji was originally taken from 
- * <http://www.windytan.com/2014/10/visualizing-hex-bytes-with-unicode-emoji.html>
- * 
- * @param buffer a buffer
- * @param buflen the length of the buffer in bytes
- * @return a string of emoji (punctuated by spaces and colons) that represents bytes in the buffer. in the form of '🐜 :🌀 :🍏 :🍇 '
- */
-
-/*
-char *buf2emoji(unsigned char *buffer, size_t buflen) {
-  char *emojibyterep;
-  int inctr;
-  unsigned int singlebyte;
-  char *os="";
-
-  for (inctr=0; inctr<buflen; inctr++) {
-    singlebyte = (unsigned int)buffer[inctr];
-    emojibyterep = (char *)emoji_map[singlebyte];
-
-    os = concat_bytearray(os, emojibyterep);
-
-    // Add a space between each emoji b/c they will overlap otherwise
-    // Add a colon after each emoji except the last one
-    if (inctr != buflen-1) {
-      os = concat_bytearray(os, " :");
-    }
-    else {
-      os = concat_bytearray(os, " ");
-    }
-  }
-  return os; 
-  // TODO: how to free this memory? 
-}
-
-
-char *buf2pgp_ostmp(unsigned char *buffer, size_t buflen) {
-  char *pgpbyterep;
-  int ctr;
-  unsigned int singlebyte;
-
-  char *ostmp, *os="";
-
-  for (ctr=0; ctr<buflen; ctr++) {
-    singlebyte = (unsigned int)buffer[ctr];
-
-    if (ctr%2 == 0) {
-      pgpbyterep = (char*) pgp_wordlist_two[singlebyte];
-    }
-    else {
-      pgpbyterep = (char*) pgp_wordlist_three[singlebyte];
-    }
-
-    ostmp = strcpy(os);
-    free(os);
-    
-    os = concat_bytearray(ostmp, pgpbyterep);
-    if (ctr != buflen-1) {
-      ostmp = strcpy(os);
-      free(os);
-      os = concat_bytearray(os, ", ");
-    }
-  }
-  return os;
-  // NOTE: Caller must free the returned pointer
-}
-
-
-char *buf2pgp_count(unsigned char *buffer, size_t buflen) {
-  char *pgpbyterep;
-  int ctr, osctr;
-  unsigned int singlebyte;
-
-  char *os;
-
-  size_t oslen = 0;
-
-  for (ctr=0; ctr<buflen; ctr++) {
-    singlebyte = (unsigned int)buffer[ctr];
-
-    if (ctr%2 == 0) {
-      pgpbyterep = (char*) pgp_wordlist_two[singlebyte];
-    }
-    else {
-      pgpbyterep = (char*) pgp_wordlist_three[singlebyte];
-    }
-
-    oslen += strlen(pgpbyterep);
-    if (ctr != buflen-1) {
-      oslen += strlen(", "));
-    }
-  }
-
-  os = (char *) malloc(oslen +1);
-  osctr = 0;
-  for (ctr=0; ctr<buflen; ctr++) {
-    singlebyte = (unsigned int)buffer[ctr];
-    if (ctr%2 == 0) {
-      pgpbyterep = (char*) pgp_wordlist_two[singlebyte];
-    }
-    else {
-      pgpbyterep = (char*) pgp_wordlist_three[singlebyte];
-    }
-
-    memcpy(os +osctr, pgpbyterep, strlen(pgpbyterep));
-    osctr += strlen(pgpbyterep);
-
-    if (ctr != buflen-1) {
-      memcpy(os +osctr, ", ", 2);
-      osctr += strlen(", ");
-    } 
-    else {
-      memcpy(os +osctr, '\0', 1);
-    }
- }
-
-  return os;
-  // NOTE: Caller must free the returned pointer
-}
-
-
-char *buf2pgp_realloc(unsigned char *buffer, size_t buflen) {
-  char *pgpbyterep;
-  int ctr, ossz, insertpt;
-  unsigned int singlebyte;
-
-  // Length of input buffer is a reasonable initial size for output buffer
-  ossz = 0;
-  char *os = (char*) malloc(buflen); 
-
-  for (ctr=0; ctr<buflen; ctr++) {
-    singlebyte = (unsigned int)buffer[ctr];
-
-    if (ctr%2 == 0) {
-      pgpbyterep = (char*) pgp_wordlist_two[singlebyte];
-    }
-    else {
-      pgpbyterep = (char*) pgp_wordlist_three[singlebyte];
-    }
-
-    insertpt = ossz;
-    ossz += strlen(pgpbyterep) +2; // +2 enough to hold the space of either ", " or '\0':
-
-    os = realloc(os, ossz);
-
-    memcpy(os +insertpt, pgpbyterep, strlen(pgpbyterep));
-    insertpt += strlen(pgpbyterep);
-
-    if (ctr != buflen-1) {
-      memcpy(os +insertpt, ", ", 2);
-    }
-    else {
-      memcpy(os +insertpt, '\0', 1);
-    }
-
-  }
-  return os;
-  // NOTE: Caller must free the returned pointer
-}
-*/
 
 /**
  * Map the bytes in a buffer to values from one or more bytemaps
@@ -468,15 +268,34 @@ char *buf2pgp_realloc(unsigned char *buffer, size_t buflen) {
  * @return a null-terminated string representing the 'buffer' parameter. each byte in the original buffer is represented by one of the bytemaps passed as the 'maps' parameter; between each pair of byte representations is the separator string, and after the representation of the last byte is the terminator string. maps are used alternatingly, in the order provided - for example, if 2 maps are passed, the first byte will be represented by its value from maps[0], the second from maps[1], the third from maps[0] again, and so on. 
  *
  */
-char *buf2map(unsigned char *buffer, size_t buflen, char *maps[], size_t maps_count, const char *separator, const char *terminator) {
-  char *byterep, *os=NULL;
-  int inctr=0, ossz=0, insertpt=0, septerm_longest=0, mapnum;
+
+char *buf2map(unsigned char *buffer, size_t buflen, const char *separator, const char *terminator, size_t maps_count, ...) {
+  char *byterep, *os=NULL, *maps[maps_count];
+  int inctr=0, ossz=0, insertpt=0, septerm_longest=0, mctr, mapnum;
   unsigned int singlebyte;
+  va_list ap;
 
   if (maps_count == 0) {
     fprintf(stderr, "Tried to map a buffer without passing any maps. Exiting...\n");
     exit(-1);
   }
+  va_start(ap, maps_count);
+
+  char *whatever;
+  printf("maps_count: %i\n", maps_count);
+  for (mctr=0; mctr<maps_count; mctr++) {
+    printf("Map counter: %i\n", mctr);
+    //maps[mctr] = va_arg(ap, char*);
+    whatever = va_arg(ap, char**);
+  }
+  va_end(ap);
+
+  int i;
+  for (i=0; i<256; i++) {
+    //printf("%s", maps[mctr][i]);
+    printf("%s", maps[0][i]);
+  }
+  printf("\n");
 
   if (strlen(separator) > strlen(terminator)) {
     septerm_longest = strlen(separator);

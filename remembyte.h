@@ -1,5 +1,5 @@
-#ifndef _EMOSSH_H
-#define _EMOSSH_H
+#ifndef _REMEMBYTE_H
+#define _REMEMBYTE_H
 
 #include <stdio.h>
 #include <stdlib.h>

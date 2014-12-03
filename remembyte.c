@@ -1,4 +1,4 @@
-#include "emossh.h"
+#include "remembyte.h"
 
 char *argv0;
 int DEBUGMODE;
@@ -90,7 +90,7 @@ int do_map_action() {
   return 0;
 }
 
-void emossh_help() {
+void remembyte_help() {
   printf("%s: experiments in SSH key fingerprint display.\n", argv0);
   printf("%s [-maDh] [HOSTNAME [PORT]]\n", argv0);
   printf("    HOSTNAME: the host to connect to. Defaults to localhost.\n");
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 
       case 'h':
       default:
-        emossh_help();
+        remembyte_help();
         exit(-1);
     }
   }
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
   }
   if (argc > optind) {
     fprintf(stderr, "ERROR: too many positional arguments.\n");
-    emossh_help();
+    remembyte_help();
     exit(-1);
   }
 

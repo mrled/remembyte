@@ -34,8 +34,11 @@ v1.0 (completeness and correctness):
     will require more research and possibly help from a more experienced C 
     programmer)
 -   build a library that can be used from any program
+    -   step one: implement generic buf2map() function @done
+    -   step other ones: ???
 -   build on Windows with cl.exe and nmake.exe
 -   build on Unix with (at least) clang and make
+-   get some sort of build system that generates makefiles or whatever
 
 v1.1 (distribution):
 

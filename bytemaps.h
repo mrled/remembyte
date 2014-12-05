@@ -4,20 +4,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdarg.h>
 
 #include <libssh/libssh.h>
 
-#include "util.h"
+// bytemaps are arrays w/ 256 null-terminated strings - one per possible byte value
+#define MAPPING_SIZE 256
 
-// Is there a better way to do these? 
-#define EMOJI_MAP_LEN 256
-#define PGP_WORDLIST_TWO_LEN 256
-#define PGP_WORDLIST_THREE_LEN 256
-
-const char *emoji_map[EMOJI_MAP_LEN];
-const char *pgp_wordlist_two[PGP_WORDLIST_TWO_LEN];
-const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN];
+const char *emoji_map[MAPPING_SIZE];
+const char *pgp_wordlist_two[MAPPING_SIZE];
+const char *pgp_wordlist_three[MAPPING_SIZE];
 
 typedef enum {
   HEX,
@@ -27,12 +22,6 @@ typedef enum {
 mapping_t a2mapping_t(char *);
 
 char *get_display_hash(unsigned char *, size_t, mapping_t);
-
-//char *buf2map(unsigned char *, size_t, char *[], size_t, const char *, const char *);
-char *buf2map(unsigned char *, size_t , const char *, const char *, size_t , ...);
-
-char *buf2emoji(unsigned char *, size_t);
-char *buf2hex(unsigned char *, size_t);
-char *buf2pgp(unsigned char *, size_t);
+char *buf2map(unsigned char *, size_t , const char *, const char *, char ***, size_t);
 
 #endif

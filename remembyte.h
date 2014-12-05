@@ -9,7 +9,6 @@
 #include <libssh/libssh.h>
 
 #include "bytemaps.h"
-#include "util.h"
 #include "act_ssh.h"
 
 void dbgprintf(const char *, ...);

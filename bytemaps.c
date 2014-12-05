@@ -4,7 +4,7 @@
  * The list of emoji was originally taken from 
  * <http://www.windytan.com/2014/10/visualizing-hex-bytes-with-unicode-emoji.html>
  */
-const char *emoji_map[EMOJI_MAP_LEN] = {
+const char *emoji_map[] = {
     "🌀", "🌂", "🌅", "🌈", "🌙", "🌞", "🌟", "🌠",
     "🌰", "🌱", "🌲", "🌳", "🌴", "🌵", "🌷", "🌸",
     "🌹", "🌺", "🌻", "🌼", "🌽", "🌾", "🌿", "🍀",
@@ -39,7 +39,7 @@ const char *emoji_map[EMOJI_MAP_LEN] = {
     "👾", "👿", "💀", "💁", "💂", "💃", "💄", "💅"
 };
 
-const char *pgp_wordlist_two[PGP_WORDLIST_TWO_LEN] = {
+const char *pgp_wordlist_two[] = {
   "aardvark", "absurd", "accrue", "acme",
   "adrift", "adult", "afflict", "ahead",
   "aimless", "Algol", "allow", "alone",
@@ -106,7 +106,7 @@ const char *pgp_wordlist_two[PGP_WORDLIST_TWO_LEN] = {
   "wayside", "willow", "woodlark", "Zulu"
 };
 
-const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN] = {
+const char *pgp_wordlist_three[] = {
   "adroitness", "adviser", "aggregate", "alkali",
   "almighty", "amulet", "amusement", "antenna",
   "applicant", "Apollo", "armistice", "article",
@@ -174,7 +174,7 @@ const char *pgp_wordlist_three[PGP_WORDLIST_THREE_LEN] = {
 };
 
 // Yeah I know this is dumb
-const char *hex_map[256] = {
+const char *hex_map[] = {
   "00", "01", "02", "03", "04", "05", "06", "07", 
   "08", "09", "0a", "0b", "0c", "0d", "0e", "0f", 
   "10", "11", "12", "13", "14", "15", "16", "17", 
@@ -228,24 +228,39 @@ mapping_t a2mapping_t(char *map_name) {
 }
 
 char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
-  char *maps[10], *separator, *terminator;
+  char ***maps, *separator, *terminator;
   size_t maps_count;
+
   switch (mapping) {
     case HEX:
-      return buf2map(hash, hash_len, ":", "", 1, &hex_map);
+      separator = ":";
+      terminator = "";
+      maps_count = 1;
+      maps = malloc(sizeof(char**) * maps_count);
+      maps[0] = (char**) hex_map;
       break;
     case EMOJI:
-      return buf2map(hash, hash_len, ": ", " ", 1, &emoji_map);
+      separator = ": ";
+      terminator = " ";
+      maps_count = 1;
+      maps = malloc(sizeof(char**) * maps_count);
+      maps[0] = (char**) emoji_map;
       break;
     case PGP:
-      return buf2map(hash, hash_len, ", ", "", 2, &pgp_wordlist_two, &pgp_wordlist_three);
+      separator = ", ";
+      terminator = ".";
+      maps_count = 2;
+      maps = malloc(sizeof(char**) * maps_count);
+      maps[0] = (char**) pgp_wordlist_two;
+      maps[1] = (char**) pgp_wordlist_three;
       break;
     default:
       fprintf(stderr, 
               "ERROR: mapping is set to %i but I can't tell what that means.\n",
               mapping);
       exit(-1);
-  }
+  }  
+  return buf2map(hash, hash_len, separator, terminator, maps, maps_count);
   // NOTE: Caller must free the returned pointer
 }
 
@@ -257,45 +272,35 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
  *
  * @param buflen the length of the buffer in bytes
  *
- * @param maps an array of pointers to bytemap arrays. bytemap arrays are arrays with 256 elements, where each element is either a single character (e.g. 'a') or a null-terminated string (e.g. "asdf").
- *
- * @param maps_count the number of maps passed
- *
  * @param separator null-terminated string to insert between each byte representation
  *
  * @param terminator null-terminated string to insert after the last byte representation 
  *
+ * @param maps an array of pointers to bytemap arrays. bytemap arrays are arrays with 256 elements, where each element is either a single character (e.g. 'a') or a null-terminated string (e.g. "asdf").
+ *
+ * @param maps_count the number of maps passed
+ *
  * @return a null-terminated string representing the 'buffer' parameter. each byte in the original buffer is represented by one of the bytemaps passed as the 'maps' parameter; between each pair of byte representations is the separator string, and after the representation of the last byte is the terminator string. maps are used alternatingly, in the order provided - for example, if 2 maps are passed, the first byte will be represented by its value from maps[0], the second from maps[1], the third from maps[0] again, and so on. 
  *
  */
+char *
+buf2map(
+  unsigned char *buffer, 
+  size_t buflen, 
+  const char *separator, 
+  const char *terminator, 
+  char *** maps,
+  size_t maps_count)
+{
 
-char *buf2map(unsigned char *buffer, size_t buflen, const char *separator, const char *terminator, size_t maps_count, ...) {
-  char *byterep, *os=NULL, *maps[maps_count];
-  int inctr=0, ossz=0, insertpt=0, septerm_longest=0, mctr, mapnum;
+  char *byterep, *os=NULL;
+  int inctr=0, ossz=0, insertpt=0, septerm_longest=0, mapnum;
   unsigned int singlebyte;
-  va_list ap;
 
   if (maps_count == 0) {
     fprintf(stderr, "Tried to map a buffer without passing any maps. Exiting...\n");
     exit(-1);
   }
-  va_start(ap, maps_count);
-
-  char *whatever;
-  printf("maps_count: %i\n", maps_count);
-  for (mctr=0; mctr<maps_count; mctr++) {
-    printf("Map counter: %i\n", mctr);
-    //maps[mctr] = va_arg(ap, char*);
-    whatever = va_arg(ap, char**);
-  }
-  va_end(ap);
-
-  int i;
-  for (i=0; i<256; i++) {
-    //printf("%s", maps[mctr][i]);
-    printf("%s", maps[0][i]);
-  }
-  printf("\n");
 
   if (strlen(separator) > strlen(terminator)) {
     septerm_longest = strlen(separator);

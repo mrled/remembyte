@@ -146,5 +146,7 @@ void print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
       printf("No key of type %s.\n", hostkeys->keytypes[kctr]);
     }
   }
+
+  free(display);
 }
 

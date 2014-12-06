@@ -16,3 +16,10 @@ Its display system is also designed to be extensible. Currently it can display b
 
 See the [todo document](./todo.markdown) for the current status, and a roadmap of planned features.
 
+## Building remembyte
+
+There is a default `Makefile` that may work for you. In that case, simply run `make`. 
+
+If it doesn't, create a new makefile that sets variables and then includes the default makefile, and then tell make to use that file with `make -f new_makefile`.
+
+See the comments at the top of the default `Makefile` for more information. 

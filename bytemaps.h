@@ -8,6 +8,8 @@
 #include <libssh/libssh.h>
 #include <pcre.h>
 
+#include "remembyte.h"
+
 // bytemaps are arrays w/ 256 null-terminated strings - one per possible byte value
 #define MAPPING_SIZE 256
 

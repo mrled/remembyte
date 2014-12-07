@@ -229,6 +229,8 @@ mapping_t a2mapping_t(char *map_name) {
 
 /* Transform a hex string to a byte array that the hex string represents
  * 
+ * Much of this has been cribbed from `pcredemo.c`, which ships with PCRE
+ * 
  * @param hexstring a string of the form '0x12ab...' or '12:ab:...' or 
  *        '12ab...'
  *
@@ -242,15 +244,31 @@ mapping_t a2mapping_t(char *map_name) {
 int hex2buf(char * hexstring, unsigned char ** outbuffer, int * outbuffer_len) {
   pcre * hexstring_re;
   const char * hexstring_re_text, * pcre_err_str;
-  int pcre_err_offset, pcre_exec_ret;
+  char byteval;
+  int pcre_err_offset, pcre_exec_ret, start_offset, matchcount=0;
+  int pcre_exec_opt, pcre_compile_opt;
+  int hexstring_len = strlen(hexstring);
 
   // out_vector_count must be a multiple of 3. 
   // out_vector will contain substring info for our match
-  int out_vector_count = strlen(hexstring)*3; 
+  int out_vector_count = hexstring_len *3; 
   int out_vector[out_vector_count];
+  dbgprintf("Using an out_vector_count of %i\n", out_vector_count);
 
-  hexstring_re_text = "^(0x)?((0-9A-Fa-f){2}:?)+$";
-  hexstring_re = pcre_compile(hexstring_re_text, 0,
+  // Initialize these so they're valid in case something goes wrong later
+  *outbuffer = (unsigned char *)"";
+  *outbuffer_len = 0;
+
+  //pcre_compile_opt = PCRE_UNGREEDY;
+  pcre_compile_opt = 0;
+  pcre_exec_opt = 0;
+
+  // For later use: 
+  // Match the whole string if it's valid, don't match otherwise
+  //   hexstring_re_text = "^(?:0x)?(?:([0-9A-Fa-f]{2}):?)*$";
+
+  hexstring_re_text = "(?:0x)?(?:([0-9A-Fa-f]{2}):?)";
+  hexstring_re = pcre_compile(hexstring_re_text, pcre_compile_opt,
     &pcre_err_str, &pcre_err_offset, NULL);
   if (!hexstring_re) {
     fprintf(stderr, "ERROR: Could not compile regex '%s': '%s'\n",
@@ -258,26 +276,131 @@ int hex2buf(char * hexstring, unsigned char ** outbuffer, int * outbuffer_len) {
     exit(-1);
   }
 
+  // TODO: study the pattern for speed w/ pcre_study()
+
+
+
+  // Execute the regex to find the first match: 
   pcre_exec_ret = pcre_exec(hexstring_re, NULL, hexstring, 
-    strlen(hexstring), 0, 0, out_vector, out_vector_count);
+    hexstring_len, 0, pcre_exec_opt, out_vector, out_vector_count);
+
   if (pcre_exec_ret == 0) {
     fprintf(stderr, 
       "The output vector was not big enough, only captured %d substrings\n",
       out_vector_count/3 -1);
-    return -1;
   }
-
+  else if (pcre_exec_ret < 0) {
+    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
+    exit(-1);
+  }
 
   int ix, substring_length;
   char *substring_start;
-  for (ix = 0; ix<pcre_exec_ret; ix++) {
+  for (ix=0; ix<pcre_exec_ret; ix++) {
     substring_start = hexstring + out_vector[2*ix];
     substring_length = out_vector[2*ix+1] - out_vector[2*ix];
-    printf("%2d: %.*s\n", ix, substring_length, substring_start);
+    dbgprintf("substring[%02d] = %.*s\n", ix, substring_length, substring_start);
   }
+
+
+  outbuffer += byteval;
+
+  matchcount = 1;
+  dbgprintf("Found 1 match\n");
+
+  // Loop to find matches after the first
+  for (;;) {
+
+    dbgprintf("Trying to find match #%i\n", matchcount);
+
+    pcre_exec_opt = 0;
+    start_offset = out_vector[1]; // Start at end of previous match 
+
+    if (out_vector[0] == out_vector[1]) {
+      if (out_vector[0] == hexstring_len) {
+        dbgprintf("Previous match (#%i) was empty & we are at the end of the "
+          "hexstring - no more matches.\n", matchcount -1);
+        break;
+      }
+      // Otherwise: run a non-empty anchorted match to find the next match(es)
+      pcre_exec_opt = PCRE_NOTEMPTY | PCRE_ANCHORED;
+    }
+
+    // Next matching operation: 
+    pcre_exec_ret = pcre_exec(hexstring_re, NULL, hexstring, 
+      hexstring_len, start_offset, pcre_exec_opt, out_vector, out_vector_count);
+
+    // a NOMATCH result: 
+    // - if 'pcre_exec_opt' is 0, we've found all matches
+    // - if it isn't, it means we have failed to find a non-empty-string match 
+    //   at a point where there was a previous empty-string match. 
+    //   therefore, increment the "end of previous match" offset
+    if (pcre_exec_ret == PCRE_ERROR_NOMATCH) {
+      if (pcre_exec_opt == 0) {
+        dbgprintf("Match #%i was not found - no more matches\n", matchcount);
+        break;
+      }
+      out_vector[1] = start_offset + 1;
+      dbgprintf("No match found for #%i - try a later offset\n", matchcount);
+      continue;
+    }
+
+    // other non-zero results are errors, however
+    if (pcre_exec_ret < 0) {
+      fprintf(stderr, "PCRE matching error %d\n", pcre_exec_ret);
+      pcre_free(hexstring_re);
+      return -1;
+    }
+
+    // a successful match result: 
+    printf("\nMatch succeeded again at offset %d\n", out_vector[0]);
+
+    if (pcre_exec_ret == 0) {
+      fprintf(stderr, 
+        "The output vector was not big enough, only captured %d substrings\n",
+        out_vector_count/3 -1);
+    }
+
+    // show substrings stored in the output vector by number
+
+    for (ix=0; ix<pcre_exec_ret; ix++) {
+      substring_start = hexstring + out_vector[2*ix];
+      substring_length = out_vector[2*ix+1] - out_vector[2*ix];
+      dbgprintf("substring[%02d] = %.*s\n", ix, substring_length, substring_start);
+    }
+
+    matchcount++;
+  }
+
+  *outbuffer = (unsigned char *)"aaaa";
+  *outbuffer_len = 5;
+
+  pcre_free(hexstring_re);
 
   return 0;
 }
+
+/*
+ * Cribbed from http://stackoverflow.com/questions/12535320
+ */
+char * hex2int(hexstring) {
+  char *h, *b, *outbuf;
+
+  outbuf = malloc((strlen(hexstring) / 2) + 1);
+  b = outbuf; // point inside the buffer
+
+  // the offset into this string is the numeric value
+  char xlate[] = "0123456789abcdef";
+
+  for (h=hexstring; *h==0; h+=2, b++) {
+    *b = ((strchr(xlate, *h) - xlate) * 16)
+       + ((strchr(xlate, *(h+1)) - xlate));
+  }
+
+  return outbuf;
+}
+
+
 
 char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
   char ***maps, *separator, *terminator;
@@ -315,7 +438,6 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
   return buf2map(hash, hash_len, separator, terminator, maps, maps_count);
   // NOTE: Caller must free the returned pointer
 }
-
 
 /**
  * Map the bytes in a buffer to values from one or more bytemaps

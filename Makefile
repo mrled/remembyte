@@ -6,7 +6,7 @@
 # For example, you might create a new makefile called new_Makefile.txt and 
 # saving the following: 
 #
-#     CCINCLUDES=" -I${HOME}/opt/homebrew/include -L${HOME}/opt/homebrew/lib "
+#     CCINCLUDES=-I${HOME}/opt/homebrew/include -L${HOME}/opt/homebrew/lib
 #     include Makefile
 #
 # Now invoke make with the `-f` flag and tell it to use your new makefile: 
@@ -19,12 +19,12 @@ CC=clang
 endif
 
 ifndef CFLAGS
-#CFLAGS="-Wall"
-CFLAGS=""
+#CFLAGS=-Wall
+CFLAGS=
 endif
 
 ifndef CCARGS
-CCARGS=""
+CCARGS=
 endif
 
 # -g tells clang to generate complete debugging info

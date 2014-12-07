@@ -15,16 +15,20 @@ void dbgprintf(const char *format, ...) {
 mapping_t mapping;
 
 typedef enum {
+  INPUT, 
   SSH,
   MAP
 } action_t;
 action_t action;
 action_t a2action_t(char *action_name) {
   action_t act;
-  if (strlen(action_name) >=3 && strncmp(action_name, "ssh", 1) == 0) {
+  if (strlen(action_name) >=5 && strncmp(action_name, "input", 5) == 0) {
+    act = INPUT;
+  }
+  else if (strlen(action_name) >=3 && strncmp(action_name, "ssh", 3) == 0) {
     act = SSH;
   }
-  else if (strlen(action_name) >=3 && strncmp(action_name, "map", 1) == 0) {
+  else if (strlen(action_name) >=3 && strncmp(action_name, "map", 3) == 0) {
     act = MAP;
   }
   else {
@@ -69,6 +73,24 @@ int do_ssh_action(char *hostname, char *port) {
   return 0;
 }
 
+int do_input_action(char * hexbuf) {
+  unsigned char * buffer, * mapped_buffer;
+  //char * mapped_buffer;
+  int buflen;
+
+  if (hex2buf(hexbuf, &buffer, &buflen) != 0) {
+    fprintf(stderr, "ERROR: Could not decode input hex.\n");
+    exit(-1);
+  }
+
+  mapped_buffer = get_display_hash(buffer, buflen, mapping);
+
+  printf("Input value: \n%s\n", hexbuf);
+  printf("Maps to: \n%s\n", mapped_buffer);
+
+  return 0;
+}
+
 int do_map_action() {
   int ctr;
   switch (mapping) {
@@ -96,9 +118,10 @@ void remembyte_help() {
   printf("    HOSTNAME: the host to connect to. Defaults to localhost.\n");
   printf("    PORT: the port to connect to. Defaults to 22.\n");
   printf("    -m MAPPING. Possible values: hex (default), emoji.\n");
-  printf("    -a ACTION. Possible values: ssh (default), map.\n");
-  printf("        ssh: connect to an ssh server.\n");
-  printf("        map: display the mapping specified by -m.\n");
+  printf("    -a ACTION. Possible values: .\n");
+  printf("        input: take input on the command line.\n");
+  printf("        ssh:   connect to an ssh server (default action).\n");
+  printf("        map:   display the mapping specified by -m.\n");
   printf("    -D: enable debug mode.\n");
   printf("    -h: display this message.\n");
 }
@@ -110,7 +133,6 @@ int main(int argc, char *argv[]) {
   DEBUGMODE = 0;
   map_str = "hex";
   action_str = "ssh";
-  char *hostname, *port;
 
   int opt;
   while ((opt = getopt(argc, argv, "m:a:Dh")) != -1) {
@@ -128,40 +150,66 @@ int main(int argc, char *argv[]) {
   argc -= optind;
   argv += optind;
 
-  dbgprintf("argc = %i, optind = %i\n", argc, optind);
-
-  hostname = "localhost"; 
-  port = "22";
-
-  optind = 0; 
-  if (argc > optind) {
-    hostname = argv[optind];
-    optind++;
-  }
-  if (argc > optind) {
-    port = argv[optind];
-    optind++;
-  }
-  if (argc > optind) {
-    fprintf(stderr, "ERROR: too many positional arguments.\n");
-    remembyte_help();
-    exit(-1);
-  }
-
-  dbgprintf("Using hostname '%s' and port '%s'\n", hostname, port);
-
   mapping = a2mapping_t(map_str);
   action = a2action_t(action_str);
 
-  switch (action) {
-    case SSH:
-      return do_ssh_action(hostname, port); break;
-    case MAP:
-      return do_map_action(); break;
-    default:
-      fprintf(stderr, 
-              "action is set to %i but I can't tell what that means ",
-              action);
+  // Do actions: 
+  if (action == INPUT) {
+    char * hexbuf;
+
+    if (argc > optind) {
+      hexbuf = argv[optind];
+      optind++;
+    }
+    else {
+      fprintf(stderr, "ERROR: no input string.\n");
+      remembyte_help();
+      exit(-1);
+    }
+
+    if (argc > optind) {
+      fprintf(stderr, "ERROR: too many positional arguments.\n");
+      remembyte_help();
+      exit(-1);
+    }
+
+    do_input_action(hexbuf);
+  }
+
+  else if (action == SSH) {
+
+    char *hostname, *port;
+    hostname = "localhost"; 
+    port = "22";
+
+    optind = 0; 
+    if (argc > optind) {
+      hostname = argv[optind];
+      optind++;
+    }
+    if (argc > optind) {
+      port = argv[optind];
+      optind++;
+    }
+    if (argc > optind) {
+      fprintf(stderr, "ERROR: too many positional arguments.\n");
+      remembyte_help();
+      exit(-1);
+    }
+    dbgprintf("Using hostname '%s' and port '%s'\n", hostname, port);    
+    return do_ssh_action(hostname, port); 
+  }
+
+  else if (action == MAP) {
+    return do_map_action(); 
+  }
+
+  else {
+    fprintf(stderr, 
+      "action is set to %i but I can't tell what that means ",
+      action);
+    remembyte_help();
+    exit(-1);
   }
 }
 

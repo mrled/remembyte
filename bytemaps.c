@@ -227,6 +227,58 @@ mapping_t a2mapping_t(char *map_name) {
   return map;
 }
 
+/* Transform a hex string to a byte array that the hex string represents
+ * 
+ * @param hexstring a string of the form '0x12ab...' or '12:ab:...' or 
+ *        '12ab...'
+ *
+ * @param outbuffer a pointer which will be set to the byte array
+ * 
+ * @param outbuffer_len a pointer which will be set to the length of the byte 
+ *        array
+ * 
+ * @return 0 if successful, nonzero otherwise
+ */
+int hex2buf(char * hexstring, unsigned char ** outbuffer, int * outbuffer_len) {
+  pcre * hexstring_re;
+  const char * hexstring_re_text, * pcre_err_str;
+  int pcre_err_offset, pcre_exec_ret;
+
+  // out_vector_count must be a multiple of 3. 
+  // out_vector will contain substring info for our match
+  int out_vector_count = strlen(hexstring)*3; 
+  int out_vector[out_vector_count];
+
+  hexstring_re_text = "^(0x)?((0-9A-Fa-f){2}:?)+$";
+  hexstring_re = pcre_compile(hexstring_re_text, 0,
+    &pcre_err_str, &pcre_err_offset, NULL);
+  if (!hexstring_re) {
+    fprintf(stderr, "ERROR: Could not compile regex '%s': '%s'\n",
+      hexstring_re_text, pcre_err_str);
+    exit(-1);
+  }
+
+  pcre_exec_ret = pcre_exec(hexstring_re, NULL, hexstring, 
+    strlen(hexstring), 0, 0, out_vector, out_vector_count);
+  if (pcre_exec_ret == 0) {
+    fprintf(stderr, 
+      "The output vector was not big enough, only captured %d substrings\n",
+      out_vector_count/3 -1);
+    return -1;
+  }
+
+
+  int ix, substring_length;
+  char *substring_start;
+  for (ix = 0; ix<pcre_exec_ret; ix++) {
+    substring_start = hexstring + out_vector[2*ix];
+    substring_length = out_vector[2*ix+1] - out_vector[2*ix];
+    printf("%2d: %.*s\n", ix, substring_length, substring_start);
+  }
+
+  return 0;
+}
+
 char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
   char ***maps, *separator, *terminator;
   size_t maps_count;

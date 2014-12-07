@@ -154,9 +154,11 @@ int main(int argc, char *argv[]) {
   action = a2action_t(action_str);
 
   // Do actions: 
+  optind = 0; 
   if (action == INPUT) {
     char * hexbuf;
 
+    dbgprintf("INPUT action. argc=%i, optind=%i\n", argc, optind);
     if (argc > optind) {
       hexbuf = argv[optind];
       optind++;
@@ -182,7 +184,6 @@ int main(int argc, char *argv[]) {
     hostname = "localhost"; 
     port = "22";
 
-    optind = 0; 
     if (argc > optind) {
       hostname = argv[optind];
       optind++;

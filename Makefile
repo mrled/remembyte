@@ -6,7 +6,8 @@
 # For example, you might create a new makefile called new_Makefile.txt and 
 # saving the following: 
 #
-#     CCINCLUDES=-I${HOME}/opt/homebrew/include -L${HOME}/opt/homebrew/lib
+#     CCINCLUDES=-I${HOME}/opt/homebrew/include 
+#     CCLIBS=-L${HOME}/opt/homebrew/lib
 #     include Makefile
 #
 # Now invoke make with the `-f` flag and tell it to use your new makefile: 
@@ -23,13 +24,21 @@ ifndef CFLAGS
 CFLAGS=
 endif
 
-ifndef CCARGS
-CCARGS=
+ifndef CCINCLUDES
+CCINCLUDES=
+endif
+
+ifndef CCLIBS
+CCLIBS=
+endif
+
+ifndef CCDEBUGARGS
+CCDEBUGARGS=-g -O0
 endif
 
 # -g tells clang to generate complete debugging info
 remembyte: remembyte.c remembyte.h bytemaps.c bytemaps.h act_ssh.c act_ssh.h
-	$(CC) -g -O0 $(CCARGS) -lssh -lm -o remembyte remembyte.c bytemaps.c act_ssh.c
+	$(CC) $(CCDEBUGARGS) -lssh -lm -lpcre $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c -o remembyte 
 
 clean:
 	rm -f remembyte

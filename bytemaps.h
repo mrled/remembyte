@@ -24,7 +24,10 @@ typedef enum {
 } mapping_t;
 mapping_t a2mapping_t(char *);
 
-int hex2buf(char *, unsigned char **, int *);
+int hex2buf(char *, unsigned char **);
+bool validate_hexstring(char *);
+char * normalize_hexstring(char *);
+unsigned char * nhex2int(char *);
 
 char *get_display_hash(unsigned char *, size_t, mapping_t);
 char *buf2map(unsigned char *, size_t , const char *, const char *, char ***, size_t);

@@ -38,13 +38,17 @@ action_t a2action_t(char *action_name) {
   return act;
 }
 
-int do_ssh_action(char *hostname, char *port) {
+void do_ssh_action(char *hostname, char *port) {
   ssh_hostkeys hostkeys = ssh_hostkeys_new();
   ssh_banners banners;
 
   ssh_session session;
   session = ssh_new();
-  if (session == NULL) return -1;
+  if (session == NULL) {
+    fprintf(stderr, "Error creating libssh session - %s\n",
+      ssh_get_error(session));
+    exit(-1);
+  }
 
   ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
   ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
@@ -69,16 +73,15 @@ int do_ssh_action(char *hostname, char *port) {
     exit(-1);
   }
   print_hostkey_fingerprint(&hostkeys, mapping);
-
-  return 0;
 }
 
-int do_input_action(char * hexbuf) {
-  unsigned char * buffer, * mapped_buffer;
-  //char * mapped_buffer;
+void do_input_action(char * hexbuf) {
+  unsigned char * buffer;
+  char * mapped_buffer;
   int buflen;
 
-  if (hex2buf(hexbuf, &buffer, &buflen) != 0) {
+  buflen = hex2buf(hexbuf, &buffer);
+  if (buflen <= 0) {
     fprintf(stderr, "ERROR: Could not decode input hex.\n");
     exit(-1);
   }
@@ -87,11 +90,9 @@ int do_input_action(char * hexbuf) {
 
   printf("Input value: \n%s\n", hexbuf);
   printf("Maps to: \n%s\n", mapped_buffer);
-
-  return 0;
 }
 
-int do_map_action() {
+void do_map_action() {
   int ctr;
   switch (mapping) {
     case HEX:
@@ -109,7 +110,6 @@ int do_map_action() {
               mapping);
   }
   /* TODO: free the 'os' memory how? */
-  return 0;
 }
 
 void remembyte_help() {
@@ -198,11 +198,11 @@ int main(int argc, char *argv[]) {
       exit(-1);
     }
     dbgprintf("Using hostname '%s' and port '%s'\n", hostname, port);    
-    return do_ssh_action(hostname, port); 
+    do_ssh_action(hostname, port); 
   }
 
   else if (action == MAP) {
-    return do_map_action(); 
+    do_map_action(); 
   }
 
   else {

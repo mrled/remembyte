@@ -227,6 +227,10 @@ mapping_t a2mapping_t(char *map_name) {
   return map;
 }
 
+// TODO: deal with Unicode. These functions will work with ASCII and UTF-8, but
+// nothing else
+
+
 /* Transform a hex string to a byte array that the hex string represents
  * 
  * Much of this has been cribbed from `pcredemo.c`, which ships with PCRE
@@ -236,18 +240,36 @@ mapping_t a2mapping_t(char *map_name) {
  *
  * @param outbuffer a pointer which will be set to the byte array
  * 
- * @param outbuffer_len a pointer which will be set to the length of the byte 
- *        array
- * 
- * @return 0 if successful, nonzero otherwise
+ * @return the length of the outbuffer if successful, a negative number otherwise
  */
-int hex2buf(char * hexstring, unsigned char ** outbuffer, int * outbuffer_len) {
-  pcre * hexstring_re;
-  const char * hexstring_re_text, * pcre_err_str;
-  char byteval;
-  int pcre_err_offset, pcre_exec_ret, start_offset, matchcount=0;
-  int pcre_exec_opt, pcre_compile_opt;
-  int hexstring_len = strlen(hexstring);
+int hex2buf(char * hexstring, unsigned char ** outbuffer) {
+  char *normhs;
+  int outbuffer_len;
+  if (! validate_hexstring(hexstring)) {
+    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
+    return -1;
+  }
+  normhs = normalize_hexstring(hexstring);
+  *outbuffer = nhex2int(normhs);
+  outbuffer_len = strlen(normhs)/2;
+
+  dbgprintf("hex2buf(): Reconstructed hex representation of input string: "
+    "'%s'\n", get_display_hash(*outbuffer, outbuffer_len, HEX));
+
+  free(normhs);
+  return outbuffer_len;
+}
+
+/* Validate a string containing a hexadecimal representation of a number
+ * 
+ * @param hexstring a string containing a hex representation of a number
+ *
+ * @return true if string is valid, false otherwise
+ */
+bool validate_hexstring(char * hexstring) {
+  pcre *validhex_re;
+  const char *validhex_re_text, *pcre_err_str;
+  int pcre_err_offset, pcre_exec_ret, hexstring_len=strlen(hexstring);
 
   // out_vector_count must be a multiple of 3. 
   // out_vector will contain substring info for our match
@@ -255,152 +277,89 @@ int hex2buf(char * hexstring, unsigned char ** outbuffer, int * outbuffer_len) {
   int out_vector[out_vector_count];
   dbgprintf("Using an out_vector_count of %i\n", out_vector_count);
 
-  // Initialize these so they're valid in case something goes wrong later
-  *outbuffer = (unsigned char *)"";
-  *outbuffer_len = 0;
-
-  //pcre_compile_opt = PCRE_UNGREEDY;
-  pcre_compile_opt = 0;
-  pcre_exec_opt = 0;
-
-  // For later use: 
-  // Match the whole string if it's valid, don't match otherwise
-  //   hexstring_re_text = "^(?:0x)?(?:([0-9A-Fa-f]{2}):?)*$";
-
-  hexstring_re_text = "(?:0x)?(?:([0-9A-Fa-f]{2}):?)";
-  hexstring_re = pcre_compile(hexstring_re_text, pcre_compile_opt,
+  // Check that the string is a valid string of hex digits
+  // (optionally beginning with '0x' and/or interspersed with ':')
+  validhex_re_text = "^(?:0x)?(?:([0-9A-Fa-f]{2}):?)*$";
+  validhex_re = pcre_compile(validhex_re_text, 0,
     &pcre_err_str, &pcre_err_offset, NULL);
-  if (!hexstring_re) {
+  if (!validhex_re) {
     fprintf(stderr, "ERROR: Could not compile regex '%s': '%s'\n",
-      hexstring_re_text, pcre_err_str);
-    exit(-1);
+      validhex_re_text, pcre_err_str);
+    return false;
   }
 
-  // TODO: study the pattern for speed w/ pcre_study()
+  pcre_exec_ret = pcre_exec(validhex_re, NULL, hexstring, hexstring_len, 0,
+    0, out_vector, out_vector_count);
 
-
-
-  // Execute the regex to find the first match: 
-  pcre_exec_ret = pcre_exec(hexstring_re, NULL, hexstring, 
-    hexstring_len, 0, pcre_exec_opt, out_vector, out_vector_count);
-
-  if (pcre_exec_ret == 0) {
-    fprintf(stderr, 
-      "The output vector was not big enough, only captured %d substrings\n",
-      out_vector_count/3 -1);
+  if (pcre_exec_ret < 0) {
+    return false;
+  }  
+  else {
+    return true;
   }
-  else if (pcre_exec_ret < 0) {
-    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
-    exit(-1);
-  }
-
-  int ix, substring_length;
-  char *substring_start;
-  for (ix=0; ix<pcre_exec_ret; ix++) {
-    substring_start = hexstring + out_vector[2*ix];
-    substring_length = out_vector[2*ix+1] - out_vector[2*ix];
-    dbgprintf("substring[%02d] = %.*s\n", ix, substring_length, substring_start);
-  }
-
-
-  outbuffer += byteval;
-
-  matchcount = 1;
-  dbgprintf("Found 1 match\n");
-
-  // Loop to find matches after the first
-  for (;;) {
-
-    dbgprintf("Trying to find match #%i\n", matchcount);
-
-    pcre_exec_opt = 0;
-    start_offset = out_vector[1]; // Start at end of previous match 
-
-    if (out_vector[0] == out_vector[1]) {
-      if (out_vector[0] == hexstring_len) {
-        dbgprintf("Previous match (#%i) was empty & we are at the end of the "
-          "hexstring - no more matches.\n", matchcount -1);
-        break;
-      }
-      // Otherwise: run a non-empty anchorted match to find the next match(es)
-      pcre_exec_opt = PCRE_NOTEMPTY | PCRE_ANCHORED;
-    }
-
-    // Next matching operation: 
-    pcre_exec_ret = pcre_exec(hexstring_re, NULL, hexstring, 
-      hexstring_len, start_offset, pcre_exec_opt, out_vector, out_vector_count);
-
-    // a NOMATCH result: 
-    // - if 'pcre_exec_opt' is 0, we've found all matches
-    // - if it isn't, it means we have failed to find a non-empty-string match 
-    //   at a point where there was a previous empty-string match. 
-    //   therefore, increment the "end of previous match" offset
-    if (pcre_exec_ret == PCRE_ERROR_NOMATCH) {
-      if (pcre_exec_opt == 0) {
-        dbgprintf("Match #%i was not found - no more matches\n", matchcount);
-        break;
-      }
-      out_vector[1] = start_offset + 1;
-      dbgprintf("No match found for #%i - try a later offset\n", matchcount);
-      continue;
-    }
-
-    // other non-zero results are errors, however
-    if (pcre_exec_ret < 0) {
-      fprintf(stderr, "PCRE matching error %d\n", pcre_exec_ret);
-      pcre_free(hexstring_re);
-      return -1;
-    }
-
-    // a successful match result: 
-    printf("\nMatch succeeded again at offset %d\n", out_vector[0]);
-
-    if (pcre_exec_ret == 0) {
-      fprintf(stderr, 
-        "The output vector was not big enough, only captured %d substrings\n",
-        out_vector_count/3 -1);
-    }
-
-    // show substrings stored in the output vector by number
-
-    for (ix=0; ix<pcre_exec_ret; ix++) {
-      substring_start = hexstring + out_vector[2*ix];
-      substring_length = out_vector[2*ix+1] - out_vector[2*ix];
-      dbgprintf("substring[%02d] = %.*s\n", ix, substring_length, substring_start);
-    }
-
-    matchcount++;
-  }
-
-  *outbuffer = (unsigned char *)"aaaa";
-  *outbuffer_len = 5;
-
-  pcre_free(hexstring_re);
-
-  return 0;
 }
 
-/*
- * Cribbed from http://stackoverflow.com/questions/12535320
+/* Normalize a string containing a hexadecimal representation of a number
+ * 
+ * TODO 1: the returned memory mu7st be freed by the caller.
+ * TODO 2: this should lowercase-ize any A-F digits as well
+ * 
+ * @param hexstring a string containing a hex representation of a number
+ *
+ * @return a normalized hexstring without leading '0x' or inter-byte ':' 
+ *         characters
  */
-char * hex2int(hexstring) {
-  char *h, *b, *outbuf;
+char * normalize_hexstring(char * hexstring) {
+  int iidx=0, oidx=0;
+  char * hexstring_norm = (char *) malloc(sizeof(char) * strlen(hexstring) +1);
 
-  outbuf = malloc((strlen(hexstring) / 2) + 1);
-  b = outbuf; // point inside the buffer
-
-  // the offset into this string is the numeric value
-  char xlate[] = "0123456789abcdef";
-
-  for (h=hexstring; *h==0; h+=2, b++) {
-    *b = ((strchr(xlate, *h) - xlate) * 16)
-       + ((strchr(xlate, *(h+1)) - xlate));
+  if (hexstring[0] == '0' && hexstring[1] == 'x') {
+    iidx = 2;
   }
+  for ( ; iidx<strlen(hexstring) ; ) {
+    if (hexstring[iidx] != ':') {
+      hexstring_norm[oidx++] = hexstring[iidx++];
+      hexstring_norm[oidx++] = hexstring[iidx++];
+    }
+    else {
+      iidx++;
+    }
+  }
+  dbgprintf("Original hexstring: '%s'; normalized: '%s'\n", hexstring, (char*)hexstring_norm);
 
-  return outbuf;
+  return hexstring_norm;
 }
 
+/* Convert a hex digit to an integer - used in nhex2int() */
+inline int digittoint(char d) {
+  return ((d) <= '9' ? (d) - '0' : (d) - 'a' + 10);
+}
 
+/* Convert a hex string to a byte array that the hex string represents
+ * 
+ * @param hexstring a string with any number of pairs of hex digits, without 
+ *        leading '0x' or inter-byte ':' characters
+ * 
+ * @return a buffer strlen(hexstring)/2 bytes long containing the byte array
+ *         represented by hexstring
+ */
+unsigned char * nhex2int(char * hexstring) {
+  size_t buffer_len = strlen(hexstring) / 2;
+  unsigned char * buffer = malloc(buffer_len);
+  long ix;
+  char ca, cb;
+
+  for (ix=0; ix<buffer_len; ix++) {
+    ca = hexstring[2 * ix + 0]; 
+    cb = hexstring[2 * ix + 1];
+    buffer[ix] = (digittoint(ca) << 4) | digittoint(cb);
+  }
+
+  dbgprintf("nhex2int(): Reconstructed hex representation of input string: "
+    "'%s'\n", get_display_hash(buffer, buffer_len, HEX));
+
+  return buffer;
+}
 
 char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
   char ***maps, *separator, *terminator;
@@ -415,7 +374,7 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
       maps[0] = (char**) hex_map;
       break;
     case EMOJI:
-      separator = ": ";
+      separator = " :";
       terminator = " ";
       maps_count = 1;
       maps = malloc(sizeof(char**) * maps_count);

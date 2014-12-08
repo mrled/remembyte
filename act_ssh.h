@@ -16,19 +16,13 @@ typedef struct _ssh_banners {
   const char *disconnect_message;
 } ssh_banners; 
 
-//extern struct _ssh_hostkeys;
-//extern typedef struct _ssh_hostkeys ssh_hostkeys;
-//struct _ssh_hostkeys;
-//typedef struct _ssh_hostkeys ssh_hostkeys;
 #define HOSTKEY_COUNT 3
-struct _ssh_hostkeys {
+typedef struct _ssh_hostkeys {
   int count;
   char *keytypes[HOSTKEY_COUNT];
   unsigned char *keyvalues[HOSTKEY_COUNT];
-  //size_t keylengths[HOSTKEY_COUNT];
   size_t keylengths[];
-};
-typedef struct _ssh_hostkeys ssh_hostkeys;
+} ssh_hostkeys;
 
 ssh_hostkeys ssh_hostkeys_new();
 

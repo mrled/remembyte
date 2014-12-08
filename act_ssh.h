@@ -8,6 +8,7 @@
 #include <libssh/libssh.h>
 
 #include "bytemaps.h"
+#include "util.h"
 
 typedef struct _ssh_banners {
   const char *issue_banner;

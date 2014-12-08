@@ -1,16 +1,16 @@
-#include "remembyte.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#include <libssh/libssh.h>
+
+#include "bytemaps.h"
+#include "act_ssh.h"
+#include "util.h"
 
 char *argv0;
-int DEBUGMODE;
-
-void dbgprintf(const char *format, ...) {
-  if (DEBUGMODE) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-  }
-}
+extern int DEBUGMODE;
 
 mapping_t mapping;
 
@@ -212,5 +212,6 @@ int main(int argc, char *argv[]) {
     remembyte_help();
     exit(-1);
   }
+  return 0;
 }
 

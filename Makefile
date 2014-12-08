@@ -15,8 +15,12 @@
 #     make -f ./new_Makefile.txt
 #
 
-ifndef CC
-CC=clang
+# TODO: when I use CC as the variable name here, my Linux machine appears to 
+#       use /bin/cc even if AFAICT $CC is not defined in my shell. I use 
+#       $CCOMPILER instead to hack around that, but I wonder if there's a better
+#       way.
+ifndef CCOMPILER
+CCOMPILER=clang
 endif
 
 ifndef CFLAGS
@@ -36,9 +40,8 @@ ifndef CCDEBUGARGS
 CCDEBUGARGS=-g -O0
 endif
 
-# -g tells clang to generate complete debugging info
-remembyte: remembyte.c remembyte.h bytemaps.c bytemaps.h act_ssh.c act_ssh.h
-	$(CC) $(CCDEBUGARGS) -lssh -lm -lpcre $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c -o remembyte 
+remembyte: remembyte.c bytemaps.c bytemaps.h act_ssh.c act_ssh.h util.c util.h
+	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm -lpcre $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c util.c -o remembyte 
 
 clean:
 	rm -f remembyte

@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include <libssh/libssh.h>
 #include <pcre.h>
 
-#include "remembyte.h"
+#include "util.h"
 
 // bytemaps are arrays w/ 256 null-terminated strings - one per possible byte value
 #define MAPPING_SIZE 256

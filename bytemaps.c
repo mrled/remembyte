@@ -330,9 +330,25 @@ char * normalize_hexstring(char * hexstring) {
   return hexstring_norm;
 }
 
-/* Convert a hex digit to an integer - used in nhex2int() */
-inline int digittoint(char d) {
-  return ((d) <= '9' ? (d) - '0' : (d) - 'a' + 10);
+/* Convert a hit (a _H_ex dig_IT_) to an integer 
+ * (used in nhex2int())
+ *
+ * Cribbed from: http://stackoverflow.com/questions/12535320/
+ * See also: http://stackoverflow.com/questions/5089701/
+ * 
+ * @param hit a hex digit, in the class [0-9a-f]. Uppercase letters are not
+ *        supported.
+ * 
+ * @return an integer value between 0-15.
+ *
+ * TODO: why does use of the `inline` keyword produce no errors on Mac OS X but 
+ *       fail to compile on Linux? 
+ * TODO: make this work with upper case hits as well
+ * TODO: what happens if you pass bad data here? 
+ */
+//inline int hit2int(char hit) {
+int hit2int(char hit) {
+  return ((hit) <= '9' ? (hit) - '0' : (hit) - 'a' + 10);
 }
 
 /* Convert a hex string to a byte array that the hex string represents
@@ -352,7 +368,9 @@ unsigned char * nhex2int(char * hexstring) {
   for (ix=0; ix<buffer_len; ix++) {
     ca = hexstring[2 * ix + 0]; 
     cb = hexstring[2 * ix + 1];
-    buffer[ix] = (digittoint(ca) << 4) | digittoint(cb);
+    // shift ca four bits to the left, because four bits is half of one byte and
+    // ca is the first half of the byte representation.
+    buffer[ix] = (hit2int(ca) << 4) | hit2int(cb);
   }
 
   dbgprintf("nhex2int(): Reconstructed hex representation of input string: "

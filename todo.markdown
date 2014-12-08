@@ -17,9 +17,14 @@ v0.2 (basic feature completeness):
 -   display pgp mapping @done
 -   add '-a' flag to specify action @done
 -   connect to TLS services (https, imaps, etc) and display cert fingerprints
--   take input buffer on the command line, via a switch or a pipe
-    -   take hex input as 0x1234 or ab239f or 12:34:56
-    -   take decimal input as 1234
+-   move from statically defined mappings to externally defined mappings
+    -   put map files somewhere. have config file that associates map(s), a 
+        terminator, & a seperator w/ a name. get_display_hash() looks these up
+        by a name the user will pass on the cli.
+-   take input buffer on the cli
+    -   accept it via a switch @done
+    -   accept it via a pipe
+    -   take hex input as 0x1234 or ab239f or 12:34:56 @done
     -   take in whole strings, and find any of the above via PCRE library, 
         replace with the requested byterep, and output the entire string with 
         replacements. Useful particularly for piping or taking input from a file
@@ -42,8 +47,9 @@ v1.0 (completeness and correctness):
 
 v1.1 (distribution):
 
--   create a NuGet package and submit it to Chocolatey 
--   submit a debian package for consideration
+-   submit a NuGet package to Chocolatey for consideration
+-   submit an apt package to debian for consideration
+-   create a homebrew tap
 
 v2.0 (and beyond):
 

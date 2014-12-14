@@ -36,6 +36,8 @@ void remembyte_help() {
   printf("        arguments: none\n");
   printf("     -  input: takes input on the command line\n");
   printf("        arguments: INPUTSTRING [INPUTSTRING [...]] (as hex)\n");
+  printf("     -  stdin (default): takes input from STDIN (as hex)\n");
+  printf("        arguments: none\n");
 }
 
 
@@ -157,6 +159,50 @@ int do_input_action(int argc, char *argv[]) {
   return 0;
 }
 
+int do_stdin_action(int argc, char *argv[]) {
+  FILE *input = stdin;
+  int chunk_max_sz=100, chunk_sz, instring_pos, actr, wctr;
+  char *inchunk[chunk_max_sz], *instring=NULL, *input_argv[1]; 
+
+  dbgprintf("do_stdin_action(): argc: '%i'\n", argc);
+  for (actr=0; actr<argc; actr++) {
+    dbgprintf("do_stdin_action(): argv[%i]: %s\n", actr, argv[actr]);
+  }
+
+  if (argc != 0) {
+    fprintf(stderr, "do_stdin_action(): too many arguments\n");
+    return -1;
+  }
+
+  instring_pos = 0;
+  instring = malloc(sizeof(char*) * chunk_max_sz);
+
+  wctr = 0;
+  while (fgets((char*)inchunk, chunk_max_sz, stdin)) {
+    dbgprintf("Iteration %i... Read chunk from stdin: '%s'\n", wctr++, inchunk);
+
+    chunk_sz = strlen((const char *)inchunk);
+    instring = realloc(instring, strlen(instring) + chunk_sz + 1);
+    if (!instring) {
+      fprintf(stderr, "Could not allocate memory\n");
+      return -1;
+    }
+    memcpy(instring +instring_pos, inchunk, chunk_sz);
+    instring_pos += chunk_sz;
+
+    if (strlen((char*)inchunk) < (chunk_max_sz -1)) {
+      dbgprintf("strlen(inchunk) (%i)   <   chunk_max_sz -1 (%i)\n", 
+        strlen((char*)inchunk), chunk_max_sz -1);
+      break;
+    }
+  }
+
+  dbgprintf("do_stdin_action() input: '%s'\n", instring);
+
+  input_argv[0] = instring;
+  return do_input_action(1, input_argv);
+}
+
 int do_map_action(int argc, char *argv[]) {
   int ix, actr;
   unsigned char * buffer;
@@ -200,7 +246,10 @@ action_type remembyte_optparse(int argc, char *argv[]) {
     argument = argv[actr];
 
     if (!action.func) {
-      if (safe_strcmp(argument, "input")) {
+      if (safe_strcmp(argument, "stdin")) {
+        action.func = &do_stdin_action;
+      }
+      else if (safe_strcmp(argument, "input")) {
         action.func = &do_input_action;
       }
       else if (safe_strcmp(argument, "ssh")) {
@@ -240,7 +289,7 @@ action_type remembyte_optparse(int argc, char *argv[]) {
 
   // The default action is the input action
   if (!action.func) {
-    action.func = &do_input_action;
+    action.func = &do_stdin_action;
   }
 
   if (DEBUGMODE) {

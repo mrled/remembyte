@@ -10,35 +10,81 @@
 #include "util.h"
 
 char *argv0;
-extern int DEBUGMODE;
+extern bool DEBUGMODE;
 
 mapping_t mapping;
 
-typedef enum {
-  INPUT, 
-  SSH,
-  MAP
-} action_t;
-action_t action;
-action_t a2action_t(char *action_name) {
-  action_t act;
-  if (strlen(action_name) >=5 && strncmp(action_name, "input", 5) == 0) {
-    act = INPUT;
-  }
-  else if (strlen(action_name) >=3 && strncmp(action_name, "ssh", 3) == 0) {
-    act = SSH;
-  }
-  else if (strlen(action_name) >=3 && strncmp(action_name, "map", 3) == 0) {
-    act = MAP;
-  }
-  else {
-    fprintf(stderr, "No such action: %s\n", action_name);
-    exit(-1);
-  }
-  return act;
+/* A struct we will use to keep track of actions and their arguments
+ */
+typedef struct {
+  enum { UNSET, INPUT, SSH, MAP } code;
+  int (* func) (int, char*[]);
+  int argc;
+  char ** argv;
+} action_type;
+
+
+void remembyte_help() {
+  printf("%s: experiments in SSH key fingerprint display\n", argv0);
+  printf("%s [-mDh] [SUBCOMMAND] [SUBCOMMAND OPTIONS]\n", argv0);
+  printf("    -m MAPPING. Possible values: hex (default), emoji, pgp\n");
+  printf("    -D: enable debug mode\n");
+  printf("    -h: display this message\n");
+  printf("    SUBCOMMAND: one of the following:\n");
+  printf("     -  ssh: connects to an SSH server and prints a key fingerprint\n");
+  printf("        arguments: [HOSTNAME] [PORT]\n");
+  printf("     -  map: prints the selected map from 0x00-0xff\n");
+  printf("        arguments: none\n");
+  printf("     -  input: takes input on the command line\n");
+  printf("        arguments: INPUTSTRING (as hex)\n");
 }
 
-void do_ssh_action(char *hostname, char *port) {
+
+/* Print a string to stderr, optionally print remembyte help, and exit
+ */
+void exprintf(int exitcode, bool showhelp, const char * format, ...) {
+  va_list args;
+
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+
+  if (showhelp) {
+    remembyte_help();
+  }
+
+  exit(exitcode);
+}
+
+int do_ssh_action(int argc, char *argv[]) {
+  int actr, pctr; // mnemonic: argument counter, parsed argument counter
+  char * hostname, * port;
+
+  dbgprintf("do_ssh_action(): argc: '%i'\n", argc);
+  for (actr=0; actr<argc; actr++) {
+    dbgprintf("do_ssh_action(): argv[%i]: %s\n", actr, argv[actr]);
+  }
+
+  // Set defaults...
+  hostname = "localhost";
+  port = "22";
+
+  for (actr=0, pctr=0; actr<argc; actr++) {
+    if (argv[actr][0] == '-') {
+      fprintf(stderr, "do_ssh_action(): Bad argument - %s\n", argv[actr]);
+      return -1;
+    }
+    switch (pctr) {
+      case 0: hostname = argv[actr]; break;
+      case 1:     port = argv[actr]; break;
+      default: 
+        fprintf(stderr, "do_ssh_action(): Bad argument - %s\n", 
+        argv[actr]); 
+        return -1;
+    }
+    pctr++;
+  }
+
   ssh_hostkeys hostkeys = ssh_hostkeys_new();
   ssh_banners banners;
 
@@ -47,7 +93,7 @@ void do_ssh_action(char *hostname, char *port) {
   if (session == NULL) {
     fprintf(stderr, "Error creating libssh session - %s\n",
       ssh_get_error(session));
-    exit(-1);
+    return -1;
   }
 
   ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
@@ -57,25 +103,53 @@ void do_ssh_action(char *hostname, char *port) {
   if (ssh_connect(session) != SSH_OK) {
     fprintf(stderr, "Error connecting to %s:%s - %s\n",
       hostname, port, ssh_get_error(session));
-    exit(-1);
+    return -1;
   }
   ssh_disconnect(session);
 
   // TODO: do return checking here?
   if (get_banners(session, &banners) != 0) {
     fprintf(stderr, "Error getting banners.\n");
-    exit(-1);
+    return -1;
   }
   print_banners(&banners);
 
   if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
     fprintf(stderr, "Error getting hostkey fingerprints.\n");
-    exit(-1);
+    return -1;
   }
   print_hostkey_fingerprint(&hostkeys, mapping);
+  return 0;
 }
 
-void do_input_action(char * hexbuf) {
+int do_input_action(int argc, char *argv[]) {
+
+  int actr;
+  char *hexbuf;
+
+  dbgprintf("do_input_action(): argc: '%i'\n", argc);
+  for (actr=0; actr<argc; actr++) {
+    dbgprintf("do_input_action(): argv[%i]: %s\n", actr, argv[actr]);
+  }
+
+  if (argc == 0) {
+    exprintf(-1, true, "No argument supplied for INPUT action.\n");
+  }
+
+  for (actr=0; actr<argc; actr++) {
+    if (argv[actr][0] == '-') {
+      fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", argv[actr]);
+      return -1;
+    }
+    switch (actr) {
+      case 0: hexbuf = argv[actr]; break;
+      default: 
+        fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", 
+        argv[actr]); 
+        return -1;
+    }
+  }
+
   unsigned char * buffer;
   char * mapped_buffer;
   int buflen;
@@ -83,135 +157,134 @@ void do_input_action(char * hexbuf) {
   buflen = hex2buf(hexbuf, &buffer);
   if (buflen <= 0) {
     fprintf(stderr, "ERROR: Could not decode input hex.\n");
-    exit(-1);
+    return -1;
   }
 
   mapped_buffer = get_display_hash(buffer, buflen, mapping);
 
   printf("Input value: \n%s\n", hexbuf);
   printf("Maps to: \n%s\n", mapped_buffer);
+
+  return 0;
 }
 
-void do_map_action() {
-  int ctr;
-  switch (mapping) {
-    case HEX:
-      printf("HEX mapping:\nThis should be self-explanatory, man.\n"); break;
-    case EMOJI:
-      printf("EMOJI mapping: \n");
-      for (ctr=0; ctr<MAPPING_SIZE; ctr++){
-        printf("%s , ", emoji_map[ctr]);
-      }
-      printf("\n");
-      break;
-    default:
-      fprintf(stderr, 
-              "ERROR: mapping is set to %i but I can't tell what that means.\n",
-              mapping);
+int do_map_action(int argc, char *argv[]) {
+  int ix, actr;
+  unsigned char * buffer;
+  char * mapped_buffer;
+
+  if (argc != 0) {
+    fprintf(stderr, "do_map_action(): too many arguments\n", argv[0]);
+    return -1;
   }
-  /* TODO: free the 'os' memory how? */
+
+  buffer = malloc(sizeof(unsigned char *) * 256);
+  for (ix=1; ix<256; ix++) {
+    buffer[ix] = ix;
+  }
+
+  mapped_buffer = get_display_hash(buffer, 256, mapping);
+  printf("%s\n", mapped_buffer);
+
+  free(mapped_buffer);
+  free(buffer);
+  return 0;
 }
 
-void remembyte_help() {
-  printf("%s: experiments in SSH key fingerprint display.\n", argv0);
-  printf("%s [-maDh] [HOSTNAME [PORT]]\n", argv0);
-  printf("    HOSTNAME: the host to connect to. Defaults to localhost.\n");
-  printf("    PORT: the port to connect to. Defaults to 22.\n");
-  printf("    -m MAPPING. Possible values: hex (default), emoji.\n");
-  printf("    -a ACTION. Possible values: .\n");
-  printf("        input: take input on the command line.\n");
-  printf("        ssh:   connect to an ssh server (default action).\n");
-  printf("        map:   display the mapping specified by -m.\n");
-  printf("    -D: enable debug mode.\n");
-  printf("    -h: display this message.\n");
+/* Parse arguments sent to remembyte
+ */
+action_type remembyte_optparse(int argc, char *argv[]) {
+  action_type action;
+  int actr, pctr, bctr;
+  char * argument;
+
+  action.code = UNSET;
+  char ** act_argv_prime = malloc(sizeof(char*) * argc); // this is too big. oh well.
+  char ** act_argv = malloc(sizeof(char*) * argc); // this is too big. oh well.
+  int act_argc;
+
+  dbgprintf("remembyte_optparse(): argc == %i\n", argc);
+
+  // Determine what action the user has specified
+  // TODO: pretty sure I can get rid of action.code here altogether
+  bool setit;
+  for (actr=1, bctr=0; actr<argc; actr++) {
+    setit=false;
+    argument = argv[actr];
+
+    if (action.code == UNSET) {
+      if (safe_strcmp(argument, "input")) {
+        action.code = INPUT;
+        action.func = &do_input_action;
+        setit=true;
+      }
+      else if (safe_strcmp(argument, "ssh")) {
+        action.code = SSH;
+        action.func = &do_ssh_action;
+        setit=true;
+      }
+      else if (safe_strcmp(argument, "map")) {
+        action.code = MAP;
+        action.func = &do_map_action;
+        setit=true;
+      }
+    }
+
+    if (!setit){
+      act_argv_prime[bctr] = argv[actr];
+      bctr++;
+    }
+  }
+  // The default action is the input action
+  if (action.code == UNSET) {
+    action.code = INPUT;
+  }
+
+  // Apply global flags, and gather action-specific arguments into the action
+  // struct's argv[] array.
+  for (actr=0, act_argc=0; actr<bctr; actr++) {
+    argument = act_argv_prime[actr];
+
+    if (strlen(argument) == 2 && argument[0] == '-') { // get global flags
+      switch (argument[1]) {
+        case 'm':
+          mapping = a2mapping_t(act_argv_prime[actr+1]);
+          actr++;
+          break;
+        case 'D':
+          DEBUGMODE=true;
+          break;
+        case 'h':
+          remembyte_help();
+          exit(0);
+      }
+      continue;
+    }
+
+    act_argv[act_argc] = argument;
+    act_argc++; // do NOT increment this in the parents of the for() loop
+  }
+
+  if (DEBUGMODE) {
+    for(actr=0; actr<act_argc; actr++) {
+      dbgprintf("act_argv[%i] == %s\n", actr, act_argv[actr]);
+    }
+  }
+
+  action.argv = act_argv;
+  action.argc = act_argc;
+  return action;
 }
 
 int main(int argc, char *argv[]) {
-  char *map_str, *action_str;
+  action_type action;
+  int actionret;
 
   argv0 = argv[0];
-  DEBUGMODE = 0;
-  map_str = "hex";
-  action_str = "ssh";
+  DEBUGMODE = false;
 
-  int opt;
-  while ((opt = getopt(argc, argv, "m:a:Dh")) != -1) {
-    switch (opt) {
-      case 'm': map_str = optarg; break;
-      case 'a': action_str = optarg; break;
-      case 'D': DEBUGMODE = 1; break;
-
-      case 'h':
-      default:
-        remembyte_help();
-        exit(-1);
-    }
-  }
-  argc -= optind;
-  argv += optind;
-
-  mapping = a2mapping_t(map_str);
-  action = a2action_t(action_str);
-
-  // Do actions: 
-  optind = 0; 
-  if (action == INPUT) {
-    char * hexbuf;
-
-    dbgprintf("INPUT action. argc=%i, optind=%i\n", argc, optind);
-    if (argc > optind) {
-      hexbuf = argv[optind];
-      optind++;
-    }
-    else {
-      fprintf(stderr, "ERROR: no input string.\n");
-      remembyte_help();
-      exit(-1);
-    }
-
-    if (argc > optind) {
-      fprintf(stderr, "ERROR: too many positional arguments.\n");
-      remembyte_help();
-      exit(-1);
-    }
-
-    do_input_action(hexbuf);
-  }
-
-  else if (action == SSH) {
-
-    char *hostname, *port;
-    hostname = "localhost"; 
-    port = "22";
-
-    if (argc > optind) {
-      hostname = argv[optind];
-      optind++;
-    }
-    if (argc > optind) {
-      port = argv[optind];
-      optind++;
-    }
-    if (argc > optind) {
-      fprintf(stderr, "ERROR: too many positional arguments.\n");
-      remembyte_help();
-      exit(-1);
-    }
-    dbgprintf("Using hostname '%s' and port '%s'\n", hostname, port);    
-    do_ssh_action(hostname, port); 
-  }
-
-  else if (action == MAP) {
-    do_map_action(); 
-  }
-
-  else {
-    fprintf(stderr, 
-      "action is set to %i but I can't tell what that means ",
-      action);
-    remembyte_help();
-    exit(-1);
-  }
-  return 0;
+  action = remembyte_optparse(argc, argv);
+  actionret = action.func(action.argc, action.argv);
+  return actionret;
 }
 

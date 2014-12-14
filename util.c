@@ -10,3 +10,15 @@ void dbgprintf(const char *format, ...) {
     va_end(args);
   }
 }
+
+// Why the fuck doesn't this exist in the standard
+bool safe_strcmp(const char * str1, const char * str2) {
+  if ((strlen(str1) != strlen(str2)) || (strncmp(str1, str2, strlen(str1)) != 0)) {
+    dbgprintf("safe_strcmp(): '%s' != '%s'\n", str1, str2);
+    return false;
+  }
+  else {
+    dbgprintf("safe_strcmp(): '%s' == '%s'\n", str1, str2);
+    return true;
+  }
+}

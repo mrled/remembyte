@@ -40,6 +40,10 @@ void remembyte_help() {
   printf("        arguments: none\n");
 }
 
+int do_help_action(int argc, char *argv[]) {
+  remembyte_help();
+  return 0;
+}
 
 /* Print a string to stderr, optionally print remembyte help, and exit
  */
@@ -236,7 +240,7 @@ action_type remembyte_optparse(int argc, char *argv[]) {
   int actr;
   char * argument;
 
-  action.func = NULL;
+  action.func = &do_help_action;
   action.argv = malloc(sizeof(char*) * argc); // this is too big. oh well.
 
   dbgprintf("remembyte_optparse(): argc == %i\n", argc);
@@ -245,7 +249,7 @@ action_type remembyte_optparse(int argc, char *argv[]) {
   for (actr=1, action.argc=0; actr<argc; actr++) {
     argument = argv[actr];
 
-    if (!action.func) {
+    if (action.func == &do_help_action) {
       if (safe_strcmp(argument, "stdin")) {
         action.func = &do_stdin_action;
       }
@@ -260,7 +264,7 @@ action_type remembyte_optparse(int argc, char *argv[]) {
       }
 
       // if we just set action.func, this arg has been processed
-      if (action.func) {
+      if (action.func != &do_help_action) {
         continue;
       }
     }
@@ -285,11 +289,6 @@ action_type remembyte_optparse(int argc, char *argv[]) {
     // Any argument not parsed above goes into the action struct's argv[] array
     action.argv[action.argc] = argument;
     action.argc++;
-  }
-
-  // The default action is the input action
-  if (!action.func) {
-    action.func = &do_stdin_action;
   }
 
   if (DEBUGMODE) {

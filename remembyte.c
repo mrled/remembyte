@@ -17,7 +17,6 @@ mapping_t mapping;
 /* A struct we will use to keep track of actions and their arguments
  */
 typedef struct {
-  enum { UNSET, INPUT, SSH, MAP } code;
   int (* func) (int, char*[]);
   int argc;
   char ** argv;
@@ -36,7 +35,7 @@ void remembyte_help() {
   printf("     -  map: prints the selected map from 0x00-0xff\n");
   printf("        arguments: none\n");
   printf("     -  input: takes input on the command line\n");
-  printf("        arguments: INPUTSTRING (as hex)\n");
+  printf("        arguments: INPUTSTRING [INPUTSTRING [...]] (as hex)\n");
 }
 
 
@@ -57,7 +56,7 @@ void exprintf(int exitcode, bool showhelp, const char * format, ...) {
 }
 
 int do_ssh_action(int argc, char *argv[]) {
-  int actr, pctr; // mnemonic: argument counter, parsed argument counter
+  int actr, bctr;
   char * hostname, * port;
 
   dbgprintf("do_ssh_action(): argc: '%i'\n", argc);
@@ -69,20 +68,20 @@ int do_ssh_action(int argc, char *argv[]) {
   hostname = "localhost";
   port = "22";
 
-  for (actr=0, pctr=0; actr<argc; actr++) {
+  for (actr=0, bctr=0; actr<argc; actr++) {
     if (argv[actr][0] == '-') {
-      fprintf(stderr, "do_ssh_action(): Bad argument - %s\n", argv[actr]);
+      fprintf(stderr, "do_ssh_action(): Bad argument - '%s'\n", argv[actr]);
       return -1;
     }
-    switch (pctr) {
+    switch (bctr) {
       case 0: hostname = argv[actr]; break;
       case 1:     port = argv[actr]; break;
       default: 
-        fprintf(stderr, "do_ssh_action(): Bad argument - %s\n", 
+        fprintf(stderr, "do_ssh_action(): Bad argument - '%s'\n", 
         argv[actr]); 
         return -1;
     }
-    pctr++;
+    bctr++;
   }
 
   ssh_hostkeys hostkeys = ssh_hostkeys_new();
@@ -91,7 +90,7 @@ int do_ssh_action(int argc, char *argv[]) {
   ssh_session session;
   session = ssh_new();
   if (session == NULL) {
-    fprintf(stderr, "Error creating libssh session - %s\n",
+    fprintf(stderr, "Error creating libssh session - '%s'\n",
       ssh_get_error(session));
     return -1;
   }
@@ -123,9 +122,9 @@ int do_ssh_action(int argc, char *argv[]) {
 }
 
 int do_input_action(int argc, char *argv[]) {
-
-  int actr;
-  char *hexbuf;
+  int actr, buflen;
+  char *hexbuf, *mapped_buffer;
+  unsigned char *buffer;
 
   dbgprintf("do_input_action(): argc: '%i'\n", argc);
   for (actr=0; actr<argc; actr++) {
@@ -137,33 +136,23 @@ int do_input_action(int argc, char *argv[]) {
   }
 
   for (actr=0; actr<argc; actr++) {
-    if (argv[actr][0] == '-') {
-      fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", argv[actr]);
+    hexbuf = argv[actr];
+    // Make sure the user didn't pass us any extra options:
+    if (hexbuf[0] == '-') {
+      fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", hexbuf);
       return -1;
     }
-    switch (actr) {
-      case 0: hexbuf = argv[actr]; break;
-      default: 
-        fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", 
-        argv[actr]); 
-        return -1;
+
+    // Assume everything else is a hex string
+    buflen = hex2buf(hexbuf, &buffer);
+    if (buflen <= 0) {
+      fprintf(stderr, "ERROR: Could not decode input hex.\n");
+      return -1;
     }
+
+    mapped_buffer = get_display_hash(buffer, buflen, mapping);
+    printf("%s => %s\n", hexbuf, mapped_buffer);
   }
-
-  unsigned char * buffer;
-  char * mapped_buffer;
-  int buflen;
-
-  buflen = hex2buf(hexbuf, &buffer);
-  if (buflen <= 0) {
-    fprintf(stderr, "ERROR: Could not decode input hex.\n");
-    return -1;
-  }
-
-  mapped_buffer = get_display_hash(buffer, buflen, mapping);
-
-  printf("Input value: \n%s\n", hexbuf);
-  printf("Maps to: \n%s\n", mapped_buffer);
 
   return 0;
 }
@@ -174,7 +163,7 @@ int do_map_action(int argc, char *argv[]) {
   char * mapped_buffer;
 
   if (argc != 0) {
-    fprintf(stderr, "do_map_action(): too many arguments\n", argv[0]);
+    fprintf(stderr, "do_map_action(): too many arguments\n");
     return -1;
   }
 
@@ -192,87 +181,74 @@ int do_map_action(int argc, char *argv[]) {
 }
 
 /* Parse arguments sent to remembyte
+ *
+ * @return an action_type struct that contains a function pointer and arguments
+ * to call
  */
 action_type remembyte_optparse(int argc, char *argv[]) {
   action_type action;
-  int actr, pctr, bctr;
+  int actr;
   char * argument;
 
-  action.code = UNSET;
-  char ** act_argv_prime = malloc(sizeof(char*) * argc); // this is too big. oh well.
-  char ** act_argv = malloc(sizeof(char*) * argc); // this is too big. oh well.
-  int act_argc;
+  action.func = NULL;
+  action.argv = malloc(sizeof(char*) * argc); // this is too big. oh well.
 
   dbgprintf("remembyte_optparse(): argc == %i\n", argc);
 
   // Determine what action the user has specified
-  // TODO: pretty sure I can get rid of action.code here altogether
-  bool setit;
-  for (actr=1, bctr=0; actr<argc; actr++) {
-    setit=false;
+  for (actr=1, action.argc=0; actr<argc; actr++) {
     argument = argv[actr];
 
-    if (action.code == UNSET) {
+    if (!action.func) {
       if (safe_strcmp(argument, "input")) {
-        action.code = INPUT;
         action.func = &do_input_action;
-        setit=true;
       }
       else if (safe_strcmp(argument, "ssh")) {
-        action.code = SSH;
         action.func = &do_ssh_action;
-        setit=true;
       }
       else if (safe_strcmp(argument, "map")) {
-        action.code = MAP;
         action.func = &do_map_action;
-        setit=true;
+      }
+
+      // if we just set action.func, this arg has been processed
+      if (action.func) {
+        continue;
       }
     }
 
-    if (!setit){
-      act_argv_prime[bctr] = argv[actr];
-      bctr++;
+    // Apply global flags
+    if (strlen(argument) == 2 && argument[0] == '-') { 
+      if (argument[1] == 'h') {
+        remembyte_help();
+        exit(0);
+      }
+      else if (argument[1] == 'm') {
+        mapping = a2mapping_t(argv[actr+1]);
+        actr++;
+        continue;
+      }
+      else if (argument[1] == 'D') {
+        DEBUGMODE=true;
+        continue;
+      }
     }
+
+    // Any argument not parsed above goes into the action struct's argv[] array
+    action.argv[action.argc] = argument;
+    action.argc++;
   }
+
   // The default action is the input action
-  if (action.code == UNSET) {
-    action.code = INPUT;
-  }
-
-  // Apply global flags, and gather action-specific arguments into the action
-  // struct's argv[] array.
-  for (actr=0, act_argc=0; actr<bctr; actr++) {
-    argument = act_argv_prime[actr];
-
-    if (strlen(argument) == 2 && argument[0] == '-') { // get global flags
-      switch (argument[1]) {
-        case 'm':
-          mapping = a2mapping_t(act_argv_prime[actr+1]);
-          actr++;
-          break;
-        case 'D':
-          DEBUGMODE=true;
-          break;
-        case 'h':
-          remembyte_help();
-          exit(0);
-      }
-      continue;
-    }
-
-    act_argv[act_argc] = argument;
-    act_argc++; // do NOT increment this in the parents of the for() loop
+  if (!action.func) {
+    action.func = &do_input_action;
   }
 
   if (DEBUGMODE) {
-    for(actr=0; actr<act_argc; actr++) {
-      dbgprintf("act_argv[%i] == %s\n", actr, act_argv[actr]);
+    for(actr=0; actr<action.argc; actr++) {
+      dbgprintf("action.argv[%i] == %s\n", actr, action.argv[actr]);
     }
   }
 
-  action.argv = act_argv;
-  action.argc = act_argc;
   return action;
 }
 

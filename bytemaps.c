@@ -221,8 +221,8 @@ mapping_t a2mapping_t(char *map_name) {
     map = PGP;
   }
   else {
-    fprintf(stderr, "No such bytemap: %s\n", map_name);
-    exit(-1);
+    dbgprintf("No such bytemap: %s\n", map_name);
+    return NOMAPPING;
   }
   return map;
 }
@@ -232,8 +232,6 @@ mapping_t a2mapping_t(char *map_name) {
 
 
 /* Transform a hex string to a byte array that the hex string represents
- * 
- * Much of this has been cribbed from `pcredemo.c`, which ships with PCRE
  * 
  * @param hexstring a string of the form '0x12ab...' or '12:ab:...' or 
  *        '12ab...'
@@ -245,12 +243,19 @@ mapping_t a2mapping_t(char *map_name) {
 int hex2buf(char * hexstring, unsigned char ** outbuffer) {
   char *normhs;
   int outbuffer_len;
-  if (! validate_hexstring(hexstring)) {
+
+  normhs = normalize_hexstring(hexstring);
+  if (!normhs) {
     fprintf(stderr, "The string %s is not a hex string\n", hexstring);
     return -1;
   }
-  normhs = normalize_hexstring(hexstring);
+
   *outbuffer = nhex2int(normhs);
+  if (! *outbuffer) {
+    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
+    return -1;
+  }
+
   outbuffer_len = strlen(normhs)/2;
 
   dbgprintf("hex2buf(): Reconstructed hex representation of input string: "
@@ -258,76 +263,6 @@ int hex2buf(char * hexstring, unsigned char ** outbuffer) {
 
   free(normhs);
   return outbuffer_len;
-}
-
-/* Validate a string containing a hexadecimal representation of a number
- * 
- * @param hexstring a string containing a hex representation of a number
- *
- * @return true if string is valid, false otherwise
- */
-bool validate_hexstring(char * hexstring) {
-  pcre *validhex_re;
-  const char *validhex_re_text, *pcre_err_str;
-  int pcre_err_offset, pcre_exec_ret, hexstring_len=strlen(hexstring);
-
-  // out_vector_count must be a multiple of 3. 
-  // out_vector will contain substring info for our match
-  int out_vector_count = hexstring_len *3; 
-  int out_vector[out_vector_count];
-  dbgprintf("Using an out_vector_count of %i\n", out_vector_count);
-
-  // Check that the string is a valid string of hex digits
-  // (optionally beginning with '0x' and/or interspersed with ':')
-  validhex_re_text = "^(?:0x)?(?:([0-9A-Fa-f]{2}):?)*$";
-  validhex_re = pcre_compile(validhex_re_text, 0,
-    &pcre_err_str, &pcre_err_offset, NULL);
-  if (!validhex_re) {
-    fprintf(stderr, "ERROR: Could not compile regex '%s': '%s'\n",
-      validhex_re_text, pcre_err_str);
-    return false;
-  }
-
-  pcre_exec_ret = pcre_exec(validhex_re, NULL, hexstring, hexstring_len, 0,
-    0, out_vector, out_vector_count);
-
-  if (pcre_exec_ret < 0) {
-    return false;
-  }  
-  else {
-    return true;
-  }
-}
-
-/* Normalize a string containing a hexadecimal representation of a number
- * 
- * TODO 1: the returned memory mu7st be freed by the caller.
- * TODO 2: this should lowercase-ize any A-F digits as well
- * 
- * @param hexstring a string containing a hex representation of a number
- *
- * @return a normalized hexstring without leading '0x' or inter-byte ':' 
- *         characters
- */
-char * normalize_hexstring(char * hexstring) {
-  int iidx=0, oidx=0;
-  char * hexstring_norm = (char *) malloc(sizeof(char) * strlen(hexstring) +1);
-
-  if (hexstring[0] == '0' && hexstring[1] == 'x') {
-    iidx = 2;
-  }
-  for ( ; iidx<strlen(hexstring) ; ) {
-    if (hexstring[iidx] != ':') {
-      hexstring_norm[oidx++] = hexstring[iidx++];
-      hexstring_norm[oidx++] = hexstring[iidx++];
-    }
-    else {
-      iidx++;
-    }
-  }
-  dbgprintf("Original hexstring: '%s'; normalized: '%s'\n", hexstring, (char*)hexstring_norm);
-
-  return hexstring_norm;
 }
 
 /* Convert a hit (a _H_ex dig_IT_) to an integer 
@@ -350,12 +285,61 @@ char * normalize_hexstring(char * hexstring) {
 int hit2int(char hit) {
   if (! (('0'<=hit<='9') || ('a'<=hit<='f'))) {
     fprintf(stderr, "Bad argument to hit2int(): '%c'\n", hit);
-    exit(-1);
+    return -1;
   }
   return ((hit) <= '9' ? (hit) - '0' : (hit) - 'a' + 10);
 }
 
-/* Convert a hex string to a byte array that the hex string represents
+/* Normalize a string containing a hexadecimal representation of a number
+ * 
+ * @param hexstring a string containing a hex representation of a number
+ *
+ * @return a normalized, guaranteed lower-case, null-terminated hexstring 
+ *         without leading '0x' or inter-byte ':' characters. if the hexstring
+ *         is invalid, return NULL. the returned pointer must be freed by the
+ *         caller.
+ */
+char * normalize_hexstring(char * hexstring) {
+  unsigned int iidx=0, oidx=0;
+  char ca, cb;
+  char * hexstring_norm = (char *) malloc(sizeof(char) * strlen(hexstring) +1);
+
+  if (hexstring[0] == '0' && hexstring[1] == 'x') {
+    iidx = 2;
+  }
+
+  while (iidx < strlen(hexstring)) {
+
+    ca = hexstring[iidx];
+    cb = hexstring[iidx +1];
+
+    if ('A'<=ca<='F') ca = tolower(ca);
+    if ('A'<=cb<='F') cb = tolower(cb);
+
+    if (hit2int(ca) <0 || hit2int(cb) <0) {
+      fprintf(stderr, "normalize_hexstring(): bad input\n");
+      return NULL;
+    }
+
+    dbgprintf("normalize_hexstring(): ca = %c, bc = %c\n", ca, cb);
+
+    if (ca != ':') {
+      hexstring_norm[oidx] = ca;
+      hexstring_norm[oidx+1] = cb;
+      oidx += 2;
+      iidx += 2;
+    }
+    else {
+      iidx++;
+    }
+  }
+  dbgprintf("Original hexstring: '%s'; normalized: '%s'\n", hexstring, (char*)hexstring_norm);
+
+  return hexstring_norm;
+}
+
+/* Convert a normalized hex string to a byte array that the hex string 
+ * represents
  * 
  * @param hexstring a string with any number of pairs of hex digits, without 
  *        leading '0x' or inter-byte ':' characters
@@ -367,14 +351,17 @@ unsigned char * nhex2int(char * hexstring) {
   size_t buffer_len = strlen(hexstring) / 2;
   unsigned char * buffer = malloc(buffer_len);
   long ix;
-  char ca, cb;
+  int ia, ib;
 
   for (ix=0; ix<buffer_len; ix++) {
-    ca = hexstring[2 * ix + 0]; 
-    cb = hexstring[2 * ix + 1];
-    // shift ca four bits to the left, because four bits is half of one byte and
-    // ca is the first half of the byte representation.
-    buffer[ix] = (hit2int(ca) << 4) | hit2int(cb);
+    ia = hit2int(hexstring[2 * ix + 0]);
+    ib = hit2int(hexstring[2 * ix + 1]);
+    if (ia <0 || ib <0) {
+      return NULL;
+    }
+    // shift ia four bits to the left, because four bits is half of one byte 
+    // and ia is the first half of the byte representation.
+    buffer[ix] = (ia << 4) | ib;
   }
 
   dbgprintf("nhex2int(): Reconstructed hex representation of input string: "
@@ -384,7 +371,7 @@ unsigned char * nhex2int(char * hexstring) {
 }
 
 char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
-  char ***maps, *separator, *terminator;
+  char ***maps, *separator, *terminator, *mapped_buffer;
   size_t maps_count;
 
   switch (mapping) {
@@ -414,9 +401,16 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
       fprintf(stderr, 
               "ERROR: mapping is set to %i but I can't tell what that means.\n",
               mapping);
-      exit(-1);
+      return NULL;
   }  
-  return buf2map(hash, hash_len, separator, terminator, maps, maps_count);
+  mapped_buffer = buf2map(hash, hash_len, separator, terminator, maps, 
+    maps_count);
+  if (!mapped_buffer) {
+    fprintf(stderr, "Error mapping buffer.\n");
+    return NULL;
+  }
+
+  return mapped_buffer;
   // NOTE: Caller must free the returned pointer
 }
 
@@ -431,7 +425,7 @@ char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) 
  *
  * @param terminator null-terminated string to insert after the last byte representation 
  *
- * @param maps an array of pointers to bytemap arrays. bytemap arrays are arrays with 256 elements, where each element is either a single character (e.g. 'a') or a null-terminated string (e.g. "asdf").
+ * @param maps an array of pointers to bytemap arrays. bytemap arrays are arrays with 256 elements, where each element is a null-terminated string.
  *
  * @param maps_count the number of maps passed
  *
@@ -453,8 +447,8 @@ buf2map(
   unsigned int singlebyte;
 
   if (maps_count == 0) {
-    fprintf(stderr, "Tried to map a buffer without passing any maps. Exiting...\n");
-    exit(-1);
+    fprintf(stderr, "Tried to map a buffer without passing any maps.\n");
+    return NULL;
   }
 
   if (strlen(separator) > strlen(terminator)) {
@@ -475,8 +469,8 @@ buf2map(
 
     os = realloc(os, ossz);
     if (! os) {
-      fprintf(stderr, "Could not allocate memory. Exiting...\n");
-      exit(-1);
+      fprintf(stderr, "Could not allocate memory.\n");
+      return NULL;
     }
 
     memcpy(os +insertpt, byterep, strlen(byterep));

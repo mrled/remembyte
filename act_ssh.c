@@ -46,7 +46,7 @@ int get_banners(ssh_session session, ssh_banners *banners) {
   return 0;
 }
 
-void print_banners(ssh_banners *banners) {
+bool print_banners(ssh_banners *banners) {
   if (banners->issue_banner) {
     printf("Issue banner:\n%s\n", banners->issue_banner);
   }
@@ -74,6 +74,8 @@ void print_banners(ssh_banners *banners) {
   else {
     printf("No disconnect message.\n");
   }
+
+  return true;
 }
 
 /**
@@ -133,13 +135,17 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
   return 0;
 }
 
-void print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
+bool print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
   int kctr;
   char *display;
 
   for (kctr=0; kctr< hostkeys->count; kctr++) {
     if (hostkeys->keylengths[kctr]) {
       display = get_display_hash(hostkeys->keyvalues[kctr], hostkeys->keylengths[kctr], mapping);
+      if (!display) {
+        fprintf(stderr, "Error getting mapped buffer.\n");
+        return false;
+      }
       printf("%s (%s)\n", display, hostkeys->keytypes[kctr]);
     }
     else {
@@ -148,5 +154,6 @@ void print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
   }
 
   free(display);
+  return true;
 }
 

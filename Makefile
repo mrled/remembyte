@@ -41,7 +41,7 @@ CCDEBUGARGS=-g -O0
 endif
 
 remembyte: remembyte.c bytemaps.c bytemaps.h act_ssh.c act_ssh.h util.c util.h
-	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm -lpcre $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c util.c -o remembyte 
+	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c util.c -o remembyte 
 
 clean:
 	rm -f remembyte

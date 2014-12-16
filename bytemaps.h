@@ -5,9 +5,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include <libssh/libssh.h>
-#include <pcre.h>
 
 #include "util.h"
 
@@ -19,6 +19,7 @@ const char *pgp_wordlist_two[MAPPING_SIZE];
 const char *pgp_wordlist_three[MAPPING_SIZE];
 
 typedef enum {
+  NOMAPPING,
   HEX,
   EMOJI,
   PGP

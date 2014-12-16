@@ -117,13 +117,20 @@ int do_ssh_action(int argc, char *argv[]) {
     fprintf(stderr, "Error getting banners.\n");
     return -1;
   }
-  print_banners(&banners);
+  if (!print_banners(&banners)) {
+    fprintf(stderr, "Error printing banners.");
+    return -1;
+  }
 
   if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
     fprintf(stderr, "Error getting hostkey fingerprints.\n");
     return -1;
   }
-  print_hostkey_fingerprint(&hostkeys, mapping);
+  if (!print_hostkey_fingerprint(&hostkeys, mapping)) {
+    fprintf(stderr, "Error printing host key fingerprint.");
+    return -1;
+  }
+
   return 0;
 }
 
@@ -157,6 +164,9 @@ int do_input_action(int argc, char *argv[]) {
     }
 
     mapped_buffer = get_display_hash(buffer, buflen, mapping);
+    if (!mapped_buffer) {
+      exprintf(-1, false, "Failed to map buffer '%s'.\n", hexbuf);
+    }
     printf("%s => %s\n", hexbuf, mapped_buffer);
   }
 
@@ -223,6 +233,9 @@ int do_map_action(int argc, char *argv[]) {
   }
 
   mapped_buffer = get_display_hash(buffer, 256, mapping);
+  if (!mapped_buffer) {
+    exprintf(-1, false, "Failed to map buffer.\n");
+  }
   printf("%s\n", mapped_buffer);
 
   free(mapped_buffer);
@@ -277,6 +290,9 @@ action_type remembyte_optparse(int argc, char *argv[]) {
       }
       else if (argument[1] == 'm') {
         mapping = a2mapping_t(argv[actr+1]);
+        if (mapping == NOMAPPING) {
+          exprintf(-1, true, "No such mapping: '%s'\n", argv[actr+1]);
+        }
         actr++;
         continue;
       }

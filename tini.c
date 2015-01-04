@@ -20,6 +20,7 @@ typedef struct {
 /* A struct representing the composed maps defined in the config file
  */
 typedef struct {
+  char *name;
   int rawmaps_count;
   rawmap_type **rawmaps; // treated as an array
   char *separator;
@@ -36,10 +37,40 @@ typedef struct {
 
 } configuration_type;
 
-// In the config file, these characters are considered separators for elements
-// that distinguish elements in a raw bytemap entry.
-char *valid_map_separators = ", ";
+// These characters are considered separators for values in the config file
+char *valid_value_separators = ", \0";
 
+composedmap_type * a2composedmap_type(
+  const char *name,
+  configuration_type config) 
+{
+  int ix;
+  composedmap_type *ret;
+  ret = NULL;
+  for (ix=0; ix<config.composedmaps_count; ix++) {
+    if (safe_strcmp(config.composedmaps[ix]->name, name)) {
+      ret = config.composedmaps[ix];
+      break;
+    }
+  }
+  return ret;
+}
+
+rawmap_type * a2rawmap_type(
+  const char *name,
+  configuration_type config) 
+{
+  int ix;
+  rawmap_type *ret;
+  ret = NULL;
+  for (ix=0; ix<config.rawmaps_count; ix++) {
+    if (safe_strcmp(config.rawmaps[ix]->name, name)) {
+      ret = config.rawmaps[ix];
+      break;
+    }
+  }
+  return ret;
+}
 
 /* Callback function for inih library. 
  * 
@@ -67,10 +98,13 @@ static int inih_handler(
   configuration_type *pconfig = (configuration_type*) configuration;
 
   // static local variables are initialized to 0
-  static int rmcount, bytectr; 
+  static int rmcount, cmcount, bytectr; 
   static bool midprocessing;
   rawmap_type *current_rawmap;
-  char *token;
+  composedmap_type *current_composedmap;
+  char *token, *cmname;
+
+  int ix;
 
   // value2 exists b/c strtok() modifies the string passed to it; we need to 
   // copy 'value' into 'value2' so that the INI parsing library doesn't barf
@@ -112,12 +146,12 @@ static int inih_handler(
       pconfig->rawmaps[rmcount-1] = current_rawmap;
     }
 
-    token = strtok( (char*)value2, valid_map_separators);
+    token = strtok( (char*)value2, valid_value_separators);
     //dbgprintf("bytectr: \n");
     for (; token != NULL; bytectr++) {
       //dbgprintf("  %i: '%s'\n", bytectr, token);
       current_rawmap->map[bytectr] = token;
-      token = strtok(NULL, valid_map_separators);
+      token = strtok(NULL, valid_value_separators);
     }
 
     if (bytectr == 256) { 
@@ -132,10 +166,61 @@ static int inih_handler(
 
   }
 
-  else if (safe_strcmp(section, "composedmap")) {
+  else if (safe_strncmp(section, "composedmap", strlen("composedmap"))) {
 
-    dbgprintf("inih_handler(): Found a new composed map called '%s'\n", 
-      name);
+    cmname = (char*) &(section[ strlen("composedmap ") ]);
+
+    current_composedmap = a2composedmap_type(cmname, *pconfig);
+    if (!current_composedmap) {
+
+      midprocessing = true;
+
+      cmcount +=1;
+      pconfig->composedmaps_count = cmcount;
+      pconfig->composedmaps = realloc(pconfig->composedmaps,
+        sizeof(composedmap_type*) * cmcount);
+
+      current_composedmap = malloc(sizeof(composedmap_type));
+      current_composedmap->name = strdup(cmname);
+      pconfig->composedmaps[cmcount-1] = current_composedmap;
+    }
+
+    if (safe_strcmp(name, "rawmaps")) {
+
+      token = strtok( (char*)value2, valid_value_separators);
+      for (ix=0; token != NULL; ix++) {
+
+        current_rawmap = a2rawmap_type(token, *pconfig);
+        current_composedmap->rawmaps_count +=1;
+        current_composedmap->rawmaps = realloc(current_composedmap->rawmaps,
+          sizeof(rawmap_type*) * current_composedmap->rawmaps_count);
+        current_composedmap->rawmaps[ix] = current_rawmap;
+
+        token = strtok(NULL, valid_value_separators);
+      }
+    }
+
+    else if (safe_strcmp(name, "separator") || 
+      safe_strcmp(name, "terminator")) 
+    {
+      if (value2[0] == '"') {
+        value2 = &value2[1];
+      }
+      if (value2[ strlen(value2) -1 ] == '"') {
+        value2[ strlen(value2) -1 ] = '\0';
+      }
+
+      if (safe_strcmp(name, "separator")) {
+        current_composedmap->separator = strdup(value2);
+      }
+      else if (safe_strcmp(name, "terminator")) {
+        current_composedmap->terminator = strdup(value2);
+      }
+    }
+
+    else {
+      dbgprintf("Ignoring extra field in config file: '%s'\n", name);
+    }
 
   }
 
@@ -150,6 +235,8 @@ static int inih_handler(
 int main(int argc, char* argv[])
 {
   configuration_type config;
+  rawmap_type *current_rawmap;
+  composedmap_type *current_composedmap;
   char *inipath = "./remembyte.conf";
   int ix, iy;
 
@@ -161,11 +248,13 @@ int main(int argc, char* argv[])
   printf("Config loaded from %s: %i rawmaps, %i composedmaps\n", 
     inipath, config.rawmaps_count, config.composedmaps_count);
 
-  printf("Rawmaps:\n");
   for (ix=0; ix<config.rawmaps_count; ix++) {
-    printf("rawmap %i '%s':  ", ix, config.rawmaps[ix]->name);
+    current_rawmap = config.rawmaps[ix];
+    printf("- rawmap %i '%s'", ix, current_rawmap->name);
+    /*
+    printf(": ");
     for (iy=0; iy<256; iy++) {
-      printf("%s", config.rawmaps[ix]->map[iy]);
+      printf("%s", current_rawmap->map[iy]);
       if (iy <255) {
         printf(", ");
       }
@@ -173,7 +262,26 @@ int main(int argc, char* argv[])
         printf("\n");
       }
     }
-    printf("\n\n");
+    */
+    printf("\n");
   }
+
+  for (ix=0; ix<config.composedmaps_count; ix++) {
+    current_composedmap = config.composedmaps[ix];
+    printf("- composedmap %i '%s'\n", 
+      ix, current_composedmap->name);
+    printf("  - Uses %i rawmap(s): ", current_composedmap->rawmaps_count);
+    for (iy=0; iy<current_composedmap->rawmaps_count; iy++) {
+      current_rawmap = current_composedmap->rawmaps[iy];
+      printf("%s", current_rawmap->name);
+      if (iy != current_composedmap->rawmaps_count -1) {
+        printf(", ");
+      }
+    }
+    printf("\n");
+    printf("  - Separator: '%s'\n  - Terminator: '%s'\n", 
+      current_composedmap->separator, current_composedmap->terminator);
+  }
+
   return 0;
 }

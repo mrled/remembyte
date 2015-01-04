@@ -67,3 +67,14 @@ Maybes & ideas:
 
 -   Remove requirement for libssh - implement just the part of the protocol I 
     need myself
+
+## Misc Tasks
+
+-   Validate configuration. For example, what if the config doesn't have a 
+    default, or has more than one default, or what if a composedmap specifies
+    a rawmap that doesn't exist?
+
+Cross platform concerns
+
+-   Abstract away some method for normalizing file paths. Fucking christ.
+

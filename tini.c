@@ -99,7 +99,6 @@ static int inih_handler(
 
   // static local variables are initialized to 0
   static int rmcount, cmcount, bytectr; 
-  static bool midprocessing;
   rawmap_type *current_rawmap;
   composedmap_type *current_composedmap;
   char *token, *cmname;
@@ -128,13 +127,8 @@ static int inih_handler(
 
   if (safe_strcmp(section, "rawmaps")) {
 
-    if (midprocessing) {
-      rmcount = pconfig->rawmaps_count;
-      current_rawmap = pconfig->rawmaps[rmcount-1];
-    }
-    else {
-      midprocessing = true;
-
+    current_rawmap = a2rawmap_type(name, *pconfig);
+    if (!current_rawmap) {
       bytectr = 0;
       rmcount +=1;
       pconfig->rawmaps_count = rmcount;
@@ -155,12 +149,10 @@ static int inih_handler(
     }
 
     if (bytectr == 256) { 
-      midprocessing = false;
     }
     else if (bytectr > 256) {
       dbgprintf("inih_handler(): more than 256 values for raw map. "
         "Current bytectr == %i\n", bytectr);
-      midprocessing = false;
       return 0;
     }
 
@@ -172,8 +164,6 @@ static int inih_handler(
 
     current_composedmap = a2composedmap_type(cmname, *pconfig);
     if (!current_composedmap) {
-
-      midprocessing = true;
 
       cmcount +=1;
       pconfig->composedmaps_count = cmcount;

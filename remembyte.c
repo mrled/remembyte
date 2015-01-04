@@ -10,7 +10,7 @@
 #include "util.h"
 
 char *argv0;
-extern bool DEBUGMODE;
+bool DEBUGMODE; // extern defined in util.h
 
 mapping_t mapping;
 

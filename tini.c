@@ -4,10 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+
 #include "inih/ini.h"
 #include "util.h"
 
-extern bool DEBUGMODE = true;
+bool DEBUGMODE = true; // extern defined in util.h
 
 /* A struct representing a raw map and its name
  */
@@ -37,12 +38,25 @@ typedef struct {
 
 // In the config file, these characters are considered separators for elements
 // that distinguish elements in a raw bytemap entry.
-//char *valid_map_separators = ", ";
-char *valid_map_separators = ",";
+char *valid_map_separators = ", ";
 
 
-// TODO: error checking? what's that?
-// nonreentrant: uses strtok(), static local vars
+/* Callback function for inih library. 
+ * 
+ * Called once per line of the config file.
+ * 
+ * nonreentrant: uses strtok(), static local vars
+ *
+ * TODO: 
+ * - error checking?  what's that? 
+ * 
+ * @param configuration a pointer to a struct that will contain our config data
+ * @param section the name of the current section 
+ * @param name the name of the configuration item (the part to the left of the
+ *        equals sign)
+ * @param value the value of the configuration item (the part to the right of
+ *        the equals sign)
+ */
 static int inih_handler(
   void *configuration, 
   const char *section, 
@@ -53,24 +67,26 @@ static int inih_handler(
   configuration_type *pconfig = (configuration_type*) configuration;
 
   // static local variables are initialized to 0
-  static int rmcount, bytectr, linectr; 
+  static int rmcount, bytectr; 
   static bool midprocessing;
-
   rawmap_type *current_rawmap;
-
   char *token;
-  token = malloc(sizeof(char) * 1024);
 
-  // tokval exists b/c strtok() modifies the string passed to it; we need to 
-  // copy 'value' into 'tokval' so that the INI parsing library doesn't barf
-  char *tokval; 
-  tokval = malloc(sizeof(char) * 1024);  
+  // value2 exists b/c strtok() modifies the string passed to it; we need to 
+  // copy 'value' into 'value2' so that the INI parsing library doesn't barf
+  char *value2; 
+  value2 = malloc(strlen(value) +1);  
+  memcpy(value2, value, strlen(value) +1);
 
+
+  /* This will print out each line of the config file as its being parsed:
+  static int linectr;
   linectr +=1;
-
-  dbgprintf("inih_handler(): %s (%zi) // %s (%zi) // %s (%zi). byte: %i // line: %i \n", 
+  dbgprintf("inih_handler(): "
+    "%s (%zi) // %s (%zi) // %s (%zi). byte: %i // line: %i \n", 
     section, strlen(section), name, strlen(name), value, strlen(value), 
     bytectr, linectr);
+  */
 
   if (strlen(section) == 0) {
     dbgprintf("inih_handler(): in general section\n");
@@ -96,10 +112,7 @@ static int inih_handler(
       pconfig->rawmaps[rmcount-1] = current_rawmap;
     }
 
-    tokval = malloc(strlen(value));
-    memcpy(tokval, value, strlen(value));
-
-    token = strtok( (char*)tokval, valid_map_separators);
+    token = strtok( (char*)value2, valid_map_separators);
     //dbgprintf("bytectr: \n");
     for (; token != NULL; bytectr++) {
       //dbgprintf("  %i: '%s'\n", bytectr, token);
@@ -114,13 +127,12 @@ static int inih_handler(
       dbgprintf("inih_handler(): more than 256 values for raw map. "
         "Current bytectr == %i\n", bytectr);
       midprocessing = false;
-      //return 0;
-      return -1;
+      return 0;
     }
 
   }
 
-  else if (safe_strcmp(section, "composedmaps")) {
+  else if (safe_strcmp(section, "composedmap")) {
 
     dbgprintf("inih_handler(): Found a new composed map called '%s'\n", 
       name);
@@ -131,8 +143,6 @@ static int inih_handler(
     dbgprintf("inih_handler(): Unknown section: '%s'\n", section);
     return 0;
   }
-
-  //free(token);
 
   return 1;
 }
@@ -153,13 +163,17 @@ int main(int argc, char* argv[])
 
   printf("Rawmaps:\n");
   for (ix=0; ix<config.rawmaps_count; ix++) {
-    printf("rawmap %i '%s':", ix, config.rawmaps[ix]->name);
+    printf("rawmap %i '%s':  ", ix, config.rawmaps[ix]->name);
     for (iy=0; iy<256; iy++) {
-      printf(" %s ", config.rawmaps[ix]->map[iy]);
+      printf("%s", config.rawmaps[ix]->map[iy]);
+      if (iy <255) {
+        printf(", ");
+      }
+      else {
+        printf("\n");
+      }
     }
     printf("\n\n");
   }
-    //printf("Config loaded from 'test.ini': version=%d, name=%s, email=%s\n",
-    //    config.version, config.name, config.email);
   return 0;
 }

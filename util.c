@@ -1,7 +1,5 @@
 #include "util.h"
 
-int DEBUGMODE;
-
 void dbgprintf(const char *format, ...) {
   if (DEBUGMODE) {
     va_list args;
@@ -11,14 +9,23 @@ void dbgprintf(const char *format, ...) {
   }
 }
 
-// Why the fuck doesn't this exist in the standard
-bool safe_strcmp(const char * str1, const char * str2) {
-  if ((strlen(str1) != strlen(str2)) || (strncmp(str1, str2, strlen(str1)) != 0)) {
-    dbgprintf("safe_strcmp(): '%s' != '%s'\n", str1, str2);
-    return false;
+// Why the fuck don't these exist in the standard
+bool safe_strncmp(const char * str1, const char * str2, size_t len) {
+  if ((strlen(str1) >= len) &&
+    (strlen(str2) >= len) &&
+    (strncmp(str1, str2, len) == 0))
+  {
+    return true;
   }
   else {
-    dbgprintf("safe_strcmp(): '%s' == '%s'\n", str1, str2);
-    return true;
+    return false;
+  }
+}
+bool safe_strcmp(const char * str1, const char * str2) {
+  if (strlen(str1) == strlen(str2)) {
+    return safe_strncmp(str1, str2, strlen(str1));
+  }
+  else {
+    return false;
   }
 }

@@ -7,69 +7,34 @@
 
 #include "inih/ini.h"
 #include "util.h"
+#include "bytemaps.h"
 
 bool DEBUGMODE = true; // extern defined in util.h
 
-/* A struct representing a raw map and its name
- */
-typedef struct {
-  char *name;
-  char *map[256];
-} rawmap_type;
-
-/* A struct representing the composed maps defined in the config file
- */
-typedef struct {
-  char *name;
-  int rawmaps_count;
-  rawmap_type **rawmaps; // treated as an array
-  char *separator;
-  char *terminator;
-} composedmap_type; 
-
-/* A struct representing the configuration we get from the config file
- */
-typedef struct {
-  int rawmaps_count;
-  rawmap_type **rawmaps; // treated as an array
-  int composedmaps_count;
-  composedmap_type **composedmaps; // treated as an array
-
-} configuration_type;
-
-// These characters are considered separators for values in the config file
-char *valid_value_separators = ", \0";
-
 composedmap_type * a2composedmap_type(
   const char *name,
-  configuration_type config) 
+  configuration_type *config) 
 {
   int ix;
-  composedmap_type *ret;
-  ret = NULL;
-  for (ix=0; ix<config.composedmaps_count; ix++) {
-    if (safe_strcmp(config.composedmaps[ix]->name, name)) {
-      ret = config.composedmaps[ix];
-      break;
+  for (ix=0; ix< config->composedmaps_count; ix++) {
+    if (safe_strcmp(config->composedmaps[ix]->name, name)) {
+      return config->composedmaps[ix];
     }
   }
-  return ret;
+  return NULL;
 }
 
 rawmap_type * a2rawmap_type(
   const char *name,
-  configuration_type config) 
+  configuration_type *config) 
 {
   int ix;
-  rawmap_type *ret;
-  ret = NULL;
-  for (ix=0; ix<config.rawmaps_count; ix++) {
-    if (safe_strcmp(config.rawmaps[ix]->name, name)) {
-      ret = config.rawmaps[ix];
-      break;
+  for (ix=0; ix< config->rawmaps_count; ix++) {
+    if (safe_strcmp(config->rawmaps[ix]->name, name)) {
+      return config->rawmaps[ix];
     }
   }
-  return ret;
+  return NULL;
 }
 
 /* Callback function for inih library. 
@@ -127,7 +92,7 @@ static int inih_handler(
 
   if (safe_strcmp(section, "rawmaps")) {
 
-    current_rawmap = a2rawmap_type(name, *pconfig);
+    current_rawmap = a2rawmap_type(name, pconfig);
     if (!current_rawmap) {
       bytectr = 0;
       rmcount +=1;
@@ -162,7 +127,7 @@ static int inih_handler(
 
     cmname = (char*) &(section[ strlen("composedmap ") ]);
 
-    current_composedmap = a2composedmap_type(cmname, *pconfig);
+    current_composedmap = a2composedmap_type(cmname, pconfig);
     if (!current_composedmap) {
 
       cmcount +=1;
@@ -180,7 +145,7 @@ static int inih_handler(
       token = strtok( (char*)value2, valid_value_separators);
       for (ix=0; token != NULL; ix++) {
 
-        current_rawmap = a2rawmap_type(token, *pconfig);
+        current_rawmap = a2rawmap_type(token, pconfig);
         current_composedmap->rawmaps_count +=1;
         current_composedmap->rawmaps = realloc(current_composedmap->rawmaps,
           sizeof(rawmap_type*) * current_composedmap->rawmaps_count);

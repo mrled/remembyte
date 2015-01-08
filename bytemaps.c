@@ -1,5 +1,7 @@
 #include "bytemaps.h"
 
+char *valid_value_separators = ", \0";
+
 /*
  * The list of emoji was originally taken from 
  * <http://www.windytan.com/2014/10/visualizing-hex-bytes-with-unicode-emoji.html>

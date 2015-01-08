@@ -28,3 +28,51 @@ Config file libraries:
 - [more options](http://stackoverflow.com/questions/3695591/parsing-ini-like-configuration-files)
 - [libconfig](http://www.hyperrealm.com/libconfig/)
 - [libconfuse](https://github.com/martinh/libconfuse)
+
+## C and Unicode
+
+God damn it's a pain in the ass to figure some of this shit out. 
+
+### wchar_t is mostly of historical interest
+
+<https://www.mail-archive.com/linux-utf8@nl.linux.org/msg05612.html>
+
+> > By the way, another question, if all those stdio.h and
+> > string.hfunctions, work well with UTF-8 strings, as they actually do,
+> > what would be
+> > the reason to use wchar_t and wchar_t-aware functions?
+> 
+> There are a mix of reasons, but most stem from the fact that the
+> Japanese designed some really bad encodings for their language prior
+> to UTF-8, which are almost impossible to use in a standard C
+> environment. At the time, the ANSI/ISO C committee thought that it
+> would be necessary to avoid using char strings directly for
+> multilingual text purposes, and was setting up to transition to
+> wchar_t strings; however, this was very incomplete. Note that C has no
+> support for using wchar_t strings as filenames, and likewise POSIX has
+> no support for using them for anything having to do with interfacing
+> with the system or library in places where strings are needed. Thus
+> there was going to be a dichotomy where multilingual text would be a
+> special case only available in some places, while system stuff,
+> filenames, etc. would have to be ASCII. UTF-8 does away with that
+> dichotomy.
+> 
+> ...
+
+He does go on to explain some cases where you could use wchar_t, but they are not normal and I don't anticipate that they will affect me.  
+
+<https://www.mail-archive.com/linux-utf8@nl.linux.org/msg05604.html>
+
+> > And what about UTF-8 strings? Do you mean that these strings should be
+> > stored in common char*
+> 
+> Yes.
+> 
+> > variables? So, what about the character size defference (Unicode and ASCII)?
+> > And also, string functions? (like, strtok())
+> 
+> strtok, strsep, strchr, strrchr, strpbrk, strspn, and strcspn will all
+> work just fine on UTF-8 strings as long as the separator characters
+> you're looking for are ASCII.
+
+

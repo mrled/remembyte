@@ -46,10 +46,17 @@ int main(int argc, char* argv[])
     printf("\n");
   }
 
+  char * text_if_default;
   for (ix=0; ix<config.composedmaps_count; ix++) {
     current_composedmap = config.composedmaps[ix];
-    printf("- composedmap %i '%s'\n", 
-      ix, current_composedmap->name);
+    if (current_composedmap->isdefault) {
+      text_if_default = "DEFAULT";
+    }
+    else {
+      text_if_default = "not default";
+    }
+    printf("- composedmap %i '%s' (%s)\n", 
+      ix, current_composedmap->name, text_if_default);
     printf("  - Uses %i rawmap(s): ", current_composedmap->rawmaps_count);
     for (iy=0; iy<current_composedmap->rawmaps_count; iy++) {
       current_rawmap = current_composedmap->rawmaps[iy];

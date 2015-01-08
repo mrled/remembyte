@@ -237,8 +237,8 @@ int hex2buf(char * hexstring, unsigned char ** outbuffer) {
 
   outbuffer_len = strlen(normhs)/2;
 
-  dbgprintf("hex2buf(): Reconstructed hex representation of input string: "
-    "'%s'\n", get_display_hash(*outbuffer, outbuffer_len, HEX));
+  //dbgprintf("hex2buf(): Reconstructed hex representation of input string: "
+  //  "'%s'\n", get_display_hash(*outbuffer, outbuffer_len, HEX));
 
   free(normhs);
   return outbuffer_len;
@@ -343,47 +343,27 @@ unsigned char * nhex2int(char * hexstring) {
     buffer[ix] = (ia << 4) | ib;
   }
 
-  dbgprintf("nhex2int(): Reconstructed hex representation of input string: "
-    "'%s'\n", get_display_hash(buffer, buffer_len, HEX));
+  //dbgprintf("nhex2int(): Reconstructed hex representation of input string: "
+  //  "'%s'\n", get_display_hash(buffer, buffer_len, HEX));
 
   return buffer;
 }
 
-char *get_display_hash(unsigned char *hash, size_t hash_len, mapping_t mapping) {
+char *get_display_hash(
+  unsigned char *hash, 
+  size_t hash_len, 
+  composedmap_type *cmap)
+{
   char ***maps, *separator, *terminator, *mapped_buffer;
   size_t maps_count;
 
-  switch (mapping) {
-    case HEX:
-      separator = ":";
-      terminator = "";
-      maps_count = 1;
-      maps = malloc(sizeof(char**) * maps_count);
-      //maps[0] = (char**) hex_map;
-      break;
-    case EMOJI:
-      separator = " :";
-      terminator = " ";
-      maps_count = 1;
-      maps = malloc(sizeof(char**) * maps_count);
-      //maps[0] = (char**) emoji_map;
-      break;
-    case PGP:
-      separator = ", ";
-      terminator = ".";
-      maps_count = 2;
-      maps = malloc(sizeof(char**) * maps_count);
-      //maps[0] = (char**) pgp_wordlist_two;
-      //maps[1] = (char**) pgp_wordlist_three;
-      break;
-    default:
-      fprintf(stderr, 
-              "ERROR: mapping is set to %i but I can't tell what that means.\n",
-              mapping);
-      return NULL;
-  }  
-  mapped_buffer = buf2map(hash, hash_len, separator, terminator, maps, 
-    maps_count);
+  if (!cmap) {
+    fprintf(stderr, "get_display_hash(): Bad map.\n");
+    return NULL;
+  }
+
+  mapped_buffer = buf2map(hash, hash_len, 
+    cmap->separator, cmap->terminator, cmap->rawmapsv, cmap->rawmaps_count);
   if (!mapped_buffer) {
     fprintf(stderr, "Error mapping buffer.\n");
     return NULL;

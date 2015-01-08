@@ -11,13 +11,6 @@
 
 #include "util.h"
 
-// bytemaps are arrays w/ 256 null-terminated strings - one per possible byte value
-#define MAPPING_SIZE 256
-
-const char *emoji_map[MAPPING_SIZE];
-const char *pgp_wordlist_two[MAPPING_SIZE];
-const char *pgp_wordlist_three[MAPPING_SIZE];
-
 /* A struct representing a raw map and its name
  */
 typedef struct rawmap_struct {
@@ -57,20 +50,12 @@ composedmap_type * get_default_map(configuration_type *);
 rawmap_type * a2rawmap_type(const char *, configuration_type *);
 int inih_handler(void *, const char *, const char *, const char *);
 
-typedef enum {
-  NOMAPPING,
-  HEX,
-  EMOJI,
-  PGP
-} mapping_t;
-mapping_t a2mapping_t(char *);
-
 int hex2buf(char *, unsigned char **);
 bool validate_hexstring(char *);
 char * normalize_hexstring(char *);
 unsigned char * nhex2int(char *);
 
-char *get_display_hash(unsigned char *, size_t, mapping_t);
+char *get_display_hash(unsigned char *, size_t, composedmap_type *);
 char *buf2map(unsigned char *, size_t , const char *, const char *, char ***, size_t);
 
 #endif

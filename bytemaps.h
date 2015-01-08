@@ -45,6 +45,12 @@ typedef struct configuration_struct {
 
 } configuration_type;
 
+
+composedmap_type * a2composedmap_type(const char *, configuration_type *);
+rawmap_type * a2rawmap_type(const char *, configuration_type *);
+int inih_handler(void *, const char *, const char *, const char *);
+
+
 // These characters are considered separators for values in the config file
 extern char *valid_value_separators;
 

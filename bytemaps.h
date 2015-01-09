@@ -45,13 +45,15 @@ typedef struct configuration_struct {
 //char *valid_value_separators = ", \0";
 extern char *valid_value_separators;
 
+configuration_type * configuration_new();
 composedmap_type * a2composedmap_type(const char *, configuration_type *);
 composedmap_type * get_default_map(configuration_type *);
 rawmap_type * a2rawmap_type(const char *, configuration_type *);
 int inih_handler(void *, const char *, const char *, const char *);
+configuration_type *process_configfile(const char *);
 void print_configuration_type(configuration_type *, int);
 
-int hex2buf(char *, unsigned char **);
+size_t hex2buf(char *, unsigned char **);
 bool validate_hexstring(char *);
 char * normalize_hexstring(char *);
 unsigned char * nhex2int(char *);

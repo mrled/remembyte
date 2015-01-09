@@ -2,6 +2,17 @@
 
 char *valid_value_separators = ", \0"; // extern defined in bytemaps.h
 
+configuration_type * configuration_new() {
+  configuration_type *config;
+  config = malloc(sizeof(configuration_type));
+  config->filepath = NULL;
+  config->rawmaps_count = 0;
+  config->rawmaps = NULL;
+  config->composedmaps_count = 0;
+  config->composedmaps = NULL;
+  return config;
+}
+
 /* Take in the name of a composedmap and a configuration_type, and return a
  * pointer to the composedmap_type referred to by the name.
  */
@@ -146,6 +157,8 @@ int inih_handler(
 
       current_composedmap = malloc(sizeof(composedmap_type));
       current_composedmap->name = strdup(cmname);
+      current_composedmap->rawmaps_count = 0;
+      current_composedmap->rawmaps = NULL;
       pconfig->composedmaps[cmcount-1] = current_composedmap;
     }
 
@@ -202,6 +215,16 @@ int inih_handler(
   return 1;
 }
 
+configuration_type *process_configfile(const char * filename) {
+  configuration_type *config;
+  config = configuration_new();
+  config->filepath = strdup(filename);
+  if (ini_parse(filename, inih_handler, config) < 0) {
+    dbgprintf("Can't load config file '%s'\n", filename);
+    config = NULL;
+  }
+  return config;
+}
 
 void print_configuration_type(
   configuration_type *config,
@@ -290,9 +313,9 @@ void print_configuration_type(
  * 
  * @return the length of the outbuffer if successful, a negative number otherwise
  */
-int hex2buf(char * hexstring, unsigned char ** outbuffer) {
+size_t hex2buf(char * hexstring, unsigned char ** outbuffer) {
   char *normhs;
-  int outbuffer_len;
+  size_t outbuffer_len;
 
   normhs = normalize_hexstring(hexstring);
   if (!normhs) {

@@ -2,18 +2,12 @@
 
 void dbgprintf(const char *format, ...) {
   if (DEBUGMODE) {
-    char *format2, *prefix;
-    prefix = "DBG: ";
-    format2 = malloc(strlen(format2) + strlen(format) +1);
-    memcpy(format2, prefix, strlen(prefix));
-    memcpy(format2 +strlen(prefix), format, strlen(format)+1);
+    fprintf(stderr, "DBG: ");
 
     va_list args;
-    va_start(args, format2);
-    vfprintf(stderr, format2, args);
+    va_start(args, format);
+    vfprintf(stderr, format, args);
     va_end(args);
-
-    free(format2);
   }
 }
 

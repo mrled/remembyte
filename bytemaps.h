@@ -9,6 +9,7 @@
 
 #include <libssh/libssh.h>
 
+#include "inih/ini.h"
 #include "util.h"
 
 /* A struct representing a raw map and its name

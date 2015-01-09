@@ -2,6 +2,8 @@
 
 char *valid_value_separators = ", \0"; // extern defined in bytemaps.h
 
+/* Return a pointer to a new configuration_type struct
+ */
 configuration_type * configuration_new() {
   configuration_type *config;
   config = malloc(sizeof(configuration_type));
@@ -29,6 +31,9 @@ composedmap_type * a2composedmap_type(
   return NULL;
 }
 
+/* Take in a configuration_type pointer and return a pointer to the 
+ * default composedmap_type if present, or NULL otherwise
+ */
 composedmap_type * get_default_map(
   configuration_type *config) 
 {
@@ -83,46 +88,38 @@ int inih_handler(
   configuration_type *pconfig = (configuration_type*) configuration;
 
   // static local variables are initialized to 0
-  static int rmcount, cmcount, bytectr; 
+  static int bytectr; 
   rawmap_type *current_rawmap;
   composedmap_type *current_composedmap;
-  char *token, *cmname;
-
+  char *token;
   int ix;
 
-  // value2 exists b/c strtok() modifies the string passed to it; we need to 
-  // copy 'value' into 'value2' so that the INI parsing library doesn't barf
-  char *value2; 
-  value2 = malloc(strlen(value) +1);  
-  memcpy(value2, value, strlen(value) +1);
-
-
-  /* This will print out each line of the config file as its being parsed:
+#ifdef REMEMBYTE_DEBUG_CONFIG_PARSER
+  // This will print out each line of the config file as its being parsed:
   static int linectr;
   linectr +=1;
   dbgprintf("inih_handler(): "
     "%s (%zi) // %s (%zi) // %s (%zi). byte: %i // line: %i \n", 
     section, strlen(section), name, strlen(name), value, strlen(value), 
     bytectr, linectr);
-  */
+#endif
 
   if (strlen(section) == 0) {
     dbgprintf("inih_handler(): in general section\n");
   }
 
   if (safe_strcmp(section, "rawmaps")) {
-
+    char *value2 = strdup(value);
     current_rawmap = a2rawmap_type(name, pconfig);
     if (!current_rawmap) {
       bytectr = 0;
-      rmcount +=1;
-      pconfig->rawmaps_count = rmcount;
+      pconfig->rawmaps_count += 1; 
       pconfig->rawmaps = realloc(pconfig->rawmaps, 
-        sizeof(rawmap_type*) * rmcount);
+        sizeof(rawmap_type*) * pconfig->rawmaps_count);
 
       current_rawmap = malloc(sizeof(rawmap_type));
       current_rawmap->name = strdup(name);
-      pconfig->rawmaps[rmcount-1] = current_rawmap;
+      pconfig->rawmaps[ pconfig->rawmaps_count -1 ] = current_rawmap;
     }
 
     token = strtok( (char*)value2, valid_value_separators);
@@ -132,6 +129,8 @@ int inih_handler(
       current_rawmap->map[bytectr] = token;
       token = strtok(NULL, valid_value_separators);
     }
+    
+    free(value2);
 
     if (bytectr == 256) { 
     }
@@ -145,24 +144,26 @@ int inih_handler(
 
   else if (safe_strncmp(section, "composedmap", strlen("composedmap"))) {
 
-    cmname = (char*) &(section[ strlen("composedmap ") ]);
+    char *cmname = (char*) &(section[ strlen("composedmap ") ]);
 
     current_composedmap = a2composedmap_type(cmname, pconfig);
     if (!current_composedmap) {
 
-      cmcount +=1;
-      pconfig->composedmaps_count = cmcount;
+      pconfig->composedmaps_count += 1;
       pconfig->composedmaps = realloc(pconfig->composedmaps,
-        sizeof(composedmap_type*) * cmcount);
+        sizeof(composedmap_type*) * pconfig->composedmaps_count);
 
       current_composedmap = malloc(sizeof(composedmap_type));
       current_composedmap->name = strdup(cmname);
       current_composedmap->rawmaps_count = 0;
       current_composedmap->rawmaps = NULL;
-      pconfig->composedmaps[cmcount-1] = current_composedmap;
+      pconfig->composedmaps[ pconfig->composedmaps_count -1 ] = 
+        current_composedmap;
     }
 
     if (safe_strcmp(name, "rawmaps")) {
+      
+      char *value2 = strdup(value);
 
       token = strtok( (char*)value2, valid_value_separators);
       for (ix=0; token != NULL; ix++) {
@@ -175,24 +176,33 @@ int inih_handler(
 
         token = strtok(NULL, valid_value_separators);
       }
+      
+      free(value2);
     }
 
     else if (safe_strcmp(name, "separator") || 
       safe_strcmp(name, "terminator")) 
     {
-      if (value2[0] == '"') {
-        value2 = &value2[1];
+      char *value2 = strdup(value);
+      char *v2idx = value2;
+
+      // Remove initial double quote marks
+      if (v2idx[0] == '"') {
+        v2idx = &value2[1];
       }
-      if (value2[ strlen(value2) -1 ] == '"') {
-        value2[ strlen(value2) -1 ] = '\0';
+      // Remove terminal double quote marks
+      if (v2idx[ strlen(v2idx) -1 ] == '"') {
+        v2idx[ strlen(v2idx) -1 ] = '\0';
       }
 
       if (safe_strcmp(name, "separator")) {
-        current_composedmap->separator = strdup(value2);
+        current_composedmap->separator = strdup(v2idx);
       }
       else if (safe_strcmp(name, "terminator")) {
-        current_composedmap->terminator = strdup(value2);
+        current_composedmap->terminator = strdup(v2idx);
       }
+      
+      free(value2);
     }
 
     else if (safe_strcmp(name, "default")) {
@@ -211,10 +221,12 @@ int inih_handler(
     dbgprintf("inih_handler(): Unknown section: '%s'\n", section);
     return 0;
   }
-
   return 1;
 }
 
+/* Take in a string representing the path to a config file, parse that file, 
+ * and return a pointer to a configuration_type struct representing that file.
+ */
 configuration_type *process_configfile(const char * filename) {
   configuration_type *config;
   config = configuration_new();
@@ -226,6 +238,12 @@ configuration_type *process_configfile(const char * filename) {
   return config;
 }
 
+/* Print a configuration_type struct
+ * @param config a configuration_type struct
+ * @param verbosity the verbosity level to use. 
+ *        - if '0', print rawmaps and composedmaps only
+ *        - if '1', also print each element in each rawmap
+ */
 void print_configuration_type(
   configuration_type *config,
   int verbosity)
@@ -391,6 +409,7 @@ char * normalize_hexstring(char * hexstring) {
 
     if (hit2int(ca) <0 || hit2int(cb) <0) {
       fprintf(stderr, "normalize_hexstring(): bad input\n");
+      free(hexstring_norm);
       return NULL;
     }
 
@@ -414,7 +433,7 @@ char * normalize_hexstring(char * hexstring) {
 /* Convert a normalized hex string to a byte array that the hex string 
  * represents
  * 
- * @param hexstring a string with any number of pairs of hex digits, without 
+ * @param hexstring a string with any number of pairs of hex digits, without
  *        leading '0x' or inter-byte ':' characters
  * 
  * @return a buffer strlen(hexstring)/2 bytes long containing the byte array
@@ -430,6 +449,7 @@ unsigned char * nhex2int(char * hexstring) {
     ia = hit2int(hexstring[2 * ix + 0]);
     ib = hit2int(hexstring[2 * ix + 1]);
     if (ia <0 || ib <0) {
+      free(buffer);
       return NULL;
     }
     // shift ia four bits to the left, because four bits is half of one byte 
@@ -448,8 +468,7 @@ char *get_display_hash(
   size_t hash_len, 
   composedmap_type *cmap)
 {
-  char ***maps, *separator, *terminator, *mapped_buffer;
-  size_t maps_count;
+  char *mapped_buffer;
 
   if (!cmap) {
     fprintf(stderr, "get_display_hash(): Bad map.\n");
@@ -495,8 +514,9 @@ buf2map(
   size_t maps_count)
 {
 
-  char *byterep, *os=NULL;
-  int inctr=0, ossz=0, insertpt=0, septerm_longest=0, mapnum;
+  char *byterep, *os=NULL, *new_os=NULL;
+  int inctr=0, ossz=0, insertpt=0, mapnum;
+  size_t septerm_longest=0;
   unsigned int singlebyte;
 
   if (maps_count == 0) {
@@ -520,11 +540,15 @@ buf2map(
     insertpt = ossz;
     ossz += strlen(byterep) + septerm_longest;
 
-    os = realloc(os, ossz);
-    if (! os) {
+    // using new_os, we can make sure to free memory before returning NULL if
+    // the realloc() call fails
+    new_os = realloc(os, ossz); 
+    if (! new_os) {
       fprintf(stderr, "Could not allocate memory.\n");
+      free(os);
       return NULL;
     }
+    os = new_os;
 
     memcpy(os +insertpt, byterep, strlen(byterep));
     insertpt += strlen(byterep);

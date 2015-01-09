@@ -49,6 +49,7 @@ composedmap_type * a2composedmap_type(const char *, configuration_type *);
 composedmap_type * get_default_map(configuration_type *);
 rawmap_type * a2rawmap_type(const char *, configuration_type *);
 int inih_handler(void *, const char *, const char *, const char *);
+void print_configuration_type(configuration_type *, int);
 
 int hex2buf(char *, unsigned char **);
 bool validate_hexstring(char *);

@@ -203,7 +203,78 @@ int inih_handler(
 }
 
 
+void print_configuration_type(
+  configuration_type *config,
+  int verbosity)
+{
+  rawmap_type *current_rawmap;
+  composedmap_type *current_composedmap;
+  int ix, iy;
+  char *defaultness_text, *fp_text;
 
+  if (verbosity < 0) {
+    dbgprintf("Verbosity incorrectly set to %i; changing to 0\n");
+    verbosity = 0;
+  }
+  else if (verbosity > 1) {
+    dbgprintf("Verbosity incorrectly set to %i; changing to 1\n");
+    verbosity = 1;
+  }
+
+  if (config->filepath) {
+    fp_text = config->filepath;
+  }
+  else {
+    fp_text = "unknown file";
+  }
+  printf("Config (loaded from %s): %i rawmaps, %i composedmaps\n", 
+    fp_text, config->rawmaps_count, config->composedmaps_count);
+
+  for (ix=0; ix<config->rawmaps_count; ix++) {
+    current_rawmap = config->rawmaps[ix];
+    printf("- rawmap %i '%s'", ix, current_rawmap->name);
+
+    if (verbosity >= 1) {
+      // print all of the elements of each rawmap
+      printf(": ");
+      for (iy=0; iy<256; iy++) {
+        printf("%s", current_rawmap->map[iy]);
+        if (iy <255) {
+          printf(", ");
+        }
+        else {
+          printf("\n");
+        }
+      }
+    }
+
+    printf("\n");
+  }
+
+  for (ix=0; ix<config->composedmaps_count; ix++) {
+    current_composedmap = config->composedmaps[ix];
+    if (current_composedmap->isdefault) {
+      defaultness_text = "DEFAULT";
+    }
+    else {
+      defaultness_text = "not default";
+    }
+    printf("- composedmap %i '%s' (%s)\n", 
+      ix, current_composedmap->name, defaultness_text);
+    printf("  - Uses %i rawmap(s): ", current_composedmap->rawmaps_count);
+    for (iy=0; iy<current_composedmap->rawmaps_count; iy++) {
+      current_rawmap = current_composedmap->rawmaps[iy];
+      printf("%s", current_rawmap->name);
+      if (iy != current_composedmap->rawmaps_count -1) {
+        printf(", ");
+      }
+    }
+    printf("\n");
+    printf("  - Separator: '%s'\n  - Terminator: '%s'\n", 
+      current_composedmap->separator, current_composedmap->terminator);
+  }
+
+}
 
 
 // TODO: deal with Unicode. These functions will work with ASCII and UTF-8, but

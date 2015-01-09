@@ -11,7 +11,6 @@
 
 bool DEBUGMODE = true; // extern defined in util.h
 
-
 int main(int argc, char* argv[])
 {
   configuration_type config;
@@ -20,55 +19,13 @@ int main(int argc, char* argv[])
   char *inipath = "./remembyte.conf";
   int ix, iy;
 
+  config.filepath = inipath;
+
   if (ini_parse(inipath, inih_handler, &config) < 0) {
     printf("Can't load 'test.ini'\n");
     return -1;
   }
 
-  printf("Config loaded from %s: %i rawmaps, %i composedmaps\n", 
-    inipath, config.rawmaps_count, config.composedmaps_count);
-
-  for (ix=0; ix<config.rawmaps_count; ix++) {
-    current_rawmap = config.rawmaps[ix];
-    printf("- rawmap %i '%s'", ix, current_rawmap->name);
-    /*
-    printf(": ");
-    for (iy=0; iy<256; iy++) {
-      printf("%s", current_rawmap->map[iy]);
-      if (iy <255) {
-        printf(", ");
-      }
-      else {
-        printf("\n");
-      }
-    }
-    */
-    printf("\n");
-  }
-
-  char * text_if_default;
-  for (ix=0; ix<config.composedmaps_count; ix++) {
-    current_composedmap = config.composedmaps[ix];
-    if (current_composedmap->isdefault) {
-      text_if_default = "DEFAULT";
-    }
-    else {
-      text_if_default = "not default";
-    }
-    printf("- composedmap %i '%s' (%s)\n", 
-      ix, current_composedmap->name, text_if_default);
-    printf("  - Uses %i rawmap(s): ", current_composedmap->rawmaps_count);
-    for (iy=0; iy<current_composedmap->rawmaps_count; iy++) {
-      current_rawmap = current_composedmap->rawmaps[iy];
-      printf("%s", current_rawmap->name);
-      if (iy != current_composedmap->rawmaps_count -1) {
-        printf(", ");
-      }
-    }
-    printf("\n");
-    printf("  - Separator: '%s'\n  - Terminator: '%s'\n", 
-      current_composedmap->separator, current_composedmap->terminator);
-  }
-
+  print_configuration_type(&config, 0);
   return 0;
 }

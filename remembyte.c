@@ -9,24 +9,30 @@
 #include "act_ssh.h"
 #include "util.h"
 
-char *argv0;
+char *ARGV0;
 bool DEBUGMODE; // extern defined in util.h
 
-mapping_t mapping;
-
-/* A struct we will use to keep track of actions and their arguments
- */
-typedef struct {
-  int (* func) (int, char*[]);
+typedef struct action_struct {
   int argc;
-  char ** argv;
+  char **argv;
+  composedmap_type *cmap;
+  int (*func) (composedmap_type*, int, char*[]);
 } action_type;
 
+action_type *action_new() {
+  action_type *action = malloc(sizeof(action_type));
+  action->argc = 0;
+  action->argv = NULL;
+  action->cmap = composedmap_new();
+  action->func = NULL;
+  return action;
+}
 
 void remembyte_help() {
-  printf("%s: experiments in SSH key fingerprint display\n", argv0);
-  printf("%s [-mDh] [SUBCOMMAND] [SUBCOMMAND OPTIONS]\n", argv0);
-  printf("    -m MAPPING. Possible values: hex (default), emoji, pgp\n");
+  printf("%s: experiments in SSH key fingerprint display\n", ARGV0);
+  printf("%s [-mFDh] [SUBCOMMAND] [SUBCOMMAND OPTIONS]\n", ARGV0);
+  printf("    -m MAPNAME. Maps are defined in the config file\n");
+  printf("    -F CONFIGFILE. Default is ~/.remembyte.conf\n");
   printf("    -D: enable debug mode\n");
   printf("    -h: display this message\n");
   printf("    SUBCOMMAND: one of the following:\n");
@@ -38,11 +44,6 @@ void remembyte_help() {
   printf("        arguments: INPUTSTRING [INPUTSTRING [...]] (as hex)\n");
   printf("     -  stdin (default): takes input from STDIN (as hex)\n");
   printf("        arguments: none\n");
-}
-
-int do_help_action(int argc, char *argv[]) {
-  remembyte_help();
-  return 0;
 }
 
 /* Print a string to stderr, optionally print remembyte help, and exit
@@ -61,9 +62,13 @@ void exprintf(int exitcode, bool showhelp, const char * format, ...) {
   exit(exitcode);
 }
 
-int do_ssh_action(int argc, char *argv[]) {
+int do_ssh_action(
+  composedmap_type *cmap,
+  int argc, 
+  char *argv[]) 
+{
   int actr, bctr;
-  char * hostname, * port;
+  char *hostname, *port, *dhash;
 
   dbgprintf("do_ssh_action(): argc: '%i'\n", argc);
   for (actr=0; actr<argc; actr++) {
@@ -112,30 +117,72 @@ int do_ssh_action(int argc, char *argv[]) {
   }
   ssh_disconnect(session);
 
-  // TODO: do return checking here?
+  // Print SSH banners:
   if (get_banners(session, &banners) != 0) {
     fprintf(stderr, "Error getting banners.\n");
     return -1;
   }
-  if (!print_banners(&banners)) {
-    fprintf(stderr, "Error printing banners.");
-    return -1;
+
+  if (banners.issue_banner) {
+    printf("Issue banner:\n%s\n", banners.issue_banner);
+  }
+  else {
+    printf("No issue banner.\n");
   }
 
+  if (banners.server_banner && strlen(banners.server_banner) >0) {
+    printf("Server banner: %s.\n", banners.server_banner);
+  }
+  else {
+    printf("No server banner.\n");
+  }
+
+  if (banners.openssh_version) {
+    printf("OpenSSH version: %i.\n", banners.openssh_version);
+  }
+  else {
+    printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
+  }
+
+  if (banners.disconnect_message) {
+    printf("Disconnect message: %s.\n", banners.disconnect_message);
+  }
+  else {
+    printf("No disconnect message.\n");
+  }
+
+  // Print SSH host key fingerprints: 
   if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
     fprintf(stderr, "Error getting hostkey fingerprints.\n");
     return -1;
   }
-  if (!print_hostkey_fingerprint(&hostkeys, mapping)) {
-    fprintf(stderr, "Error printing host key fingerprint.");
-    return -1;
+
+  for (actr=0; actr< hostkeys.count; actr++) {
+    if (hostkeys.keylengths[actr]) {
+      dhash = get_display_hash(hostkeys.keyvalues[actr], 
+        hostkeys.keylengths[actr], cmap);
+      if (!dhash) {
+        fprintf(stderr, "Error getting mapped buffer.\n");
+        return false;
+      }
+      printf("%s (%s)\n", dhash, hostkeys.keytypes[actr]);
+      free(dhash);
+    }
+    else {
+      printf("No key of type %s.\n", hostkeys.keytypes[actr]);
+    }
   }
 
   return 0;
 }
 
-int do_input_action(int argc, char *argv[]) {
-  int actr, buflen;
+int do_input_action(
+  composedmap_type *cmap,
+  int argc, 
+  char *argv[]) 
+{
+  int actr;
+  size_t buflen;
   char *hexbuf, *mapped_buffer;
   unsigned char *buffer;
 
@@ -163,7 +210,7 @@ int do_input_action(int argc, char *argv[]) {
       return -1;
     }
 
-    mapped_buffer = get_display_hash(buffer, buflen, mapping);
+    mapped_buffer = get_display_hash(buffer, buflen, cmap);
     if (!mapped_buffer) {
       exprintf(-1, false, "Failed to map buffer '%s'.\n", hexbuf);
     }
@@ -173,10 +220,17 @@ int do_input_action(int argc, char *argv[]) {
   return 0;
 }
 
-int do_stdin_action(int argc, char *argv[]) {
-  FILE *input = stdin;
-  int chunk_max_sz=100, chunk_sz, instring_pos, actr, wctr;
-  char *inchunk[chunk_max_sz], *instring=NULL, *input_argv[1]; 
+int do_stdin_action(
+  composedmap_type *cmap,
+  int argc, 
+  char *argv[]) 
+{
+  int chunk_max_sz=100, instring_pos, actr, wctr;
+  size_t chunk_sz;
+  //char *inchunk[chunk_max_sz], *instring, *instring_new,
+  //  *input_argv[1];
+  char *inchunk[chunk_max_sz], *instring, *instring_new, *input_argv[1];
+  
 
   dbgprintf("do_stdin_action(): argc: '%i'\n", argc);
   for (actr=0; actr<argc; actr++) {
@@ -189,18 +243,20 @@ int do_stdin_action(int argc, char *argv[]) {
   }
 
   instring_pos = 0;
-  instring = malloc(sizeof(char*) * chunk_max_sz);
+  instring = malloc( sizeof(char) * chunk_max_sz);
 
   wctr = 0;
   while (fgets((char*)inchunk, chunk_max_sz, stdin)) {
     dbgprintf("Iteration %i... Read chunk from stdin: '%s'\n", wctr++, inchunk);
 
     chunk_sz = strlen((const char *)inchunk);
-    instring = realloc(instring, strlen(instring) + chunk_sz + 1);
+    instring_new = realloc(instring, strlen(instring) + chunk_sz + 1);
     if (!instring) {
       fprintf(stderr, "Could not allocate memory\n");
+      free(instring);
       return -1;
     }
+    instring = instring_new;
     memcpy(instring +instring_pos, inchunk, chunk_sz);
     instring_pos += chunk_sz;
 
@@ -214,11 +270,15 @@ int do_stdin_action(int argc, char *argv[]) {
   dbgprintf("do_stdin_action() input: '%s'\n", instring);
 
   input_argv[0] = instring;
-  return do_input_action(1, input_argv);
+  return do_input_action(cmap, 1, input_argv);
 }
 
-int do_map_action(int argc, char *argv[]) {
-  int ix, actr;
+int do_map_action(
+  composedmap_type *cmap,
+  int argc, 
+  char *argv[]) 
+{
+  int ix;
   unsigned char * buffer;
   char * mapped_buffer;
 
@@ -227,12 +287,14 @@ int do_map_action(int argc, char *argv[]) {
     return -1;
   }
 
-  buffer = malloc(sizeof(unsigned char *) * 256);
+  print_configuration_type();
+
+  buffer = malloc(sizeof(unsigned char) * 256);
   for (ix=1; ix<256; ix++) {
     buffer[ix] = ix;
   }
 
-  mapped_buffer = get_display_hash(buffer, 256, mapping);
+  mapped_buffer = get_display_hash(buffer, 256, cmap);
   if (!mapped_buffer) {
     exprintf(-1, false, "Failed to map buffer.\n");
   }
@@ -243,41 +305,85 @@ int do_map_action(int argc, char *argv[]) {
   return 0;
 }
 
+int do_help_action(
+  composedmap_type *cmap,
+  int argc, 
+  char *argv[]) 
+{
+  remembyte_help();
+  return 0;
+}
+
+#define CFLOCS_SZ 3
+char *find_default_configfile() {
+  int ix;
+  char *cflocs[CFLOCS_SZ] = {
+    "~/.remembyte.conf", "../etc/remembyte.conf", "./remembyte.conf"
+  };
+  char *found_file = NULL;
+  for (ix=0; ix<CFLOCS_SZ; ix++) {
+    found_file = resolve_path(cflocs[ix]);
+    if (found_file) {
+      dbgprintf("Found default configuration file at '%s'\n", found_file);
+      return found_file;
+    }
+  }
+  dbgprintf("Did not find a default config file on the filesystem\n");
+  return NULL;
+}
+
 /* Parse arguments sent to remembyte
  *
- * @return an action_type struct that contains a function pointer and arguments
- * to call
  */
-action_type remembyte_optparse(int argc, char *argv[]) {
-  action_type action;
-  int actr;
-  char * argument;
 
-  action.func = &do_help_action;
-  action.argv = malloc(sizeof(char*) * argc); // this is too big. oh well.
+action_type *remembyte_optparse(
+  int argc, 
+  char *argv[],
+  configuration_type *config)
+{
+/*  
+void remembyte_optparse(
+  int argc, 
+  char *argv[], 
+  configuration_type *config,
+  composedmap_type *cmap,
+  void **action, 
+  int *action_argc, // TODO: require this to be malloc'd by the caller
+  char **action_argv)  // TODO: require this to be malloc'd by the caller
+{
+*/
+
+  action_type *action = action_new();
+  action->func = do_help_action;
+
+  int actr;
+  char *argument, *mapname, *configfile;
+
+  mapname = NULL;
+  configfile = find_default_configfile();
 
   dbgprintf("remembyte_optparse(): argc == %i\n", argc);
 
   // Determine what action the user has specified
-  for (actr=1, action.argc=0; actr<argc; actr++) {
+  for (actr=1, action->argc=0; actr<argc; actr++) {
     argument = argv[actr];
 
-    if (action.func == &do_help_action) {
+    if (*action->func == do_help_action) {
       if (safe_strcmp(argument, "stdin")) {
-        action.func = &do_stdin_action;
+        action->func = do_stdin_action;
       }
       else if (safe_strcmp(argument, "input")) {
-        action.func = &do_input_action;
+        action->func = do_input_action;
       }
       else if (safe_strcmp(argument, "ssh")) {
-        action.func = &do_ssh_action;
+        action->func = do_ssh_action;
       }
       else if (safe_strcmp(argument, "map")) {
-        action.func = &do_map_action;
+        action->func = do_map_action;
       }
 
-      // if we just set action.func, this arg has been processed
-      if (action.func != &do_help_action) {
+      // if we just set "action", this arg has been processed
+      if (*action->func != do_help_action) {
         continue;
       }
     }
@@ -289,10 +395,7 @@ action_type remembyte_optparse(int argc, char *argv[]) {
         exit(0);
       }
       else if (argument[1] == 'm') {
-        mapping = a2mapping_t(argv[actr+1]);
-        if (mapping == NOMAPPING) {
-          exprintf(-1, true, "No such mapping: '%s'\n", argv[actr+1]);
-        }
+        mapname = strdup(argv[actr+1]);
         actr++;
         continue;
       }
@@ -300,31 +403,69 @@ action_type remembyte_optparse(int argc, char *argv[]) {
         DEBUGMODE=true;
         continue;
       }
+      else if (argument[1] == 'F') {
+        configfile = resolve_path(argv[actr+1]);
+        actr++;
+        continue;
+      }
     }
 
     // Any argument not parsed above goes into the action struct's argv[] array
-    action.argv[action.argc] = argument;
-    action.argc++;
+    action->argc += 1;
+    action->argv = realloc(action->argv, sizeof(char*) * action->argc );
+    action->argv[ action->argc -1] = argument;
   }
 
-  if (DEBUGMODE) {
-    for(actr=0; actr<action.argc; actr++) {
-      dbgprintf("action.argv[%i] == %s\n", actr, action.argv[actr]);
+  config = process_configfile(configfile);
+  if (!config) {
+    exprintf(-1, false, "Could not load config file.\n");
+  }
+
+  if (mapname) {
+    action->cmap = a2composedmap_type(mapname, config);
+    if (!action->cmap) {
+      exprintf(-1, false, "No such mapping name '%s'\n", mapname);
     }
   }
+  else {
+    action->cmap = get_default_map(config);
+    if (!action->cmap) {
+      exprintf(-1, false, "No map name provided on command line, and no "
+        "default mapping provided in config file.\n");
+    }
+  }
+  
+  free(mapname);
+  dbgprintf("Using byte mapping '%s'\n", action->cmap->name);
 
+  for(actr=0; actr< action->argc; actr++) {
+    dbgprintf("action->argv[%i] == %s\n", actr, action->argv[actr]);
+  }
+  
   return action;
 }
 
 int main(int argc, char *argv[]) {
-  action_type action;
+  /*
+  int (*action)(composedmap_type*, int, char**);
+  int *action_argc;
+  char **action_argv;
+   */
+  action_type *action;
   int actionret;
+  configuration_type *configuration = configuration_new();
+  composedmap_type cmap;
 
-  argv0 = argv[0];
+  ARGV0 = argv[0];
   DEBUGMODE = false;
 
-  action = remembyte_optparse(argc, argv);
-  actionret = action.func(action.argc, action.argv);
+  /*
+  remembyte_optparse(argc, argv, configuration, &cmap, &(action),
+    action_argc, action_argv);
+  */
+  action = remembyte_optparse(argc, argv, configuration);
+  
+  actionret = action->func(&cmap, action->argc, action->argv);
   return actionret;
 }
 

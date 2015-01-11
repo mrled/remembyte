@@ -47,6 +47,8 @@ typedef struct configuration_struct {
 extern char *valid_value_separators;
 
 configuration_type * configuration_new();
+rawmap_type * rawmap_new();
+composedmap_type * composedmap_new();
 composedmap_type * a2composedmap_type(const char *, configuration_type *);
 composedmap_type * get_default_map(configuration_type *);
 rawmap_type * a2rawmap_type(const char *, configuration_type *);

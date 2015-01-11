@@ -2,9 +2,11 @@
 
 char *valid_value_separators = ", \0"; // extern defined in bytemaps.h
 
+// TODO: I need *_free() functions to match all these *_new() functions
+
 /* Return a pointer to a new configuration_type struct
  */
-configuration_type * configuration_new() {
+configuration_type *configuration_new() {
   configuration_type *config;
   config = malloc(sizeof(configuration_type));
   config->filepath = NULL;
@@ -12,6 +14,40 @@ configuration_type * configuration_new() {
   config->rawmaps = NULL;
   config->composedmaps_count = 0;
   config->composedmaps = NULL;
+  return config;
+}
+
+composedmap_type *composedmap_new() {
+  composedmap_type *cmap;
+  cmap = malloc(sizeof(composedmap_type));
+  cmap->name = "";
+  cmap->isdefault = false;
+  cmap->rawmaps_count = 0;
+  cmap->rawmaps = NULL;
+  cmap->rawmapsv = NULL;
+  cmap->separator = "";
+  cmap->terminator = "";
+  return cmap;
+}
+
+rawmap_type *rawmap_new() {
+  rawmap_type *rmap;
+  rmap = malloc(sizeof(rawmap_type));
+  rmap->name = "";
+  return rmap;
+}
+
+/* Take in a string representing the path to a config file, parse that file, 
+ * and return a pointer to a configuration_type struct representing that file.
+ */
+configuration_type *process_configfile(const char * filename) {
+  configuration_type *config;
+  config = configuration_new();
+  config->filepath = strdup(filename);
+  if (ini_parse(filename, inih_handler, config) < 0) {
+    dbgprintf("Can't load config file '%s'\n", filename);
+    config = NULL;
+  }
   return config;
 }
 
@@ -89,6 +125,7 @@ int inih_handler(
 
   // static local variables are initialized to 0
   static int bytectr; 
+
   rawmap_type *current_rawmap;
   composedmap_type *current_composedmap;
   char *token;
@@ -126,7 +163,7 @@ int inih_handler(
     //dbgprintf("bytectr: \n");
     for (; token != NULL; bytectr++) {
       //dbgprintf("  %i: '%s'\n", bytectr, token);
-      current_rawmap->map[bytectr] = token;
+      current_rawmap->map[bytectr] = strdup(token);
       token = strtok(NULL, valid_value_separators);
     }
     
@@ -222,20 +259,6 @@ int inih_handler(
     return 0;
   }
   return 1;
-}
-
-/* Take in a string representing the path to a config file, parse that file, 
- * and return a pointer to a configuration_type struct representing that file.
- */
-configuration_type *process_configfile(const char * filename) {
-  configuration_type *config;
-  config = configuration_new();
-  config->filepath = strdup(filename);
-  if (ini_parse(filename, inih_handler, config) < 0) {
-    dbgprintf("Can't load config file '%s'\n", filename);
-    config = NULL;
-  }
-  return config;
 }
 
 /* Print a configuration_type struct
@@ -413,7 +436,7 @@ char * normalize_hexstring(char * hexstring) {
       return NULL;
     }
 
-    dbgprintf("normalize_hexstring(): ca = %c, bc = %c\n", ca, cb);
+    dbgprintf("normalize_hexstring(): ca = %c, cb = %c\n", ca, cb);
 
     if (ca != ':') {
       hexstring_norm[oidx] = ca;

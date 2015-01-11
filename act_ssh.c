@@ -88,7 +88,7 @@ bool print_banners(ssh_banners *banners) {
 int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
 
   int kctr;
-  ssh_key pubkey;
+  ssh_key pubkey = NULL;
 
   size_t hkhash_buf_len;
   unsigned char *hkhash_buf;
@@ -130,11 +130,15 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
     }
     ssh_disconnect(session);
   }
-  ssh_key_free(pubkey);
+
+  if (pubkey != NULL) {
+    ssh_key_free(pubkey);
+  }
 
   return 0;
 }
 
+/*
 bool print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
   int kctr;
   char *display;
@@ -156,4 +160,5 @@ bool print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
   free(display);
   return true;
 }
+ */
 

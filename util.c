@@ -39,7 +39,8 @@ bool safe_strcmp(const char * str1, const char * str2) {
  * Take a path that might contain ., .., extraneous /, or a ~ character, and 
  * return the absolute path that the user intends
  */
-char * resolve_path(const char * path) {
+char * resolve_path(const char * path)
+{
   char *resolved, *query;
 
   query = strdup(path);

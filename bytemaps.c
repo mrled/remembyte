@@ -194,6 +194,7 @@ int inih_handler(
       current_composedmap->name = strdup(cmname);
       current_composedmap->rawmaps_count = 0;
       current_composedmap->rawmaps = NULL;
+      current_composedmap->rawmapsv = NULL;
       pconfig->composedmaps[ pconfig->composedmaps_count -1 ] = 
         current_composedmap;
     }
@@ -201,6 +202,8 @@ int inih_handler(
     if (safe_strcmp(name, "rawmaps")) {
       
       char *value2 = strdup(value);
+
+      // TODO: I don't think my code handles multiple lines in this section
 
       token = strtok( (char*)value2, valid_value_separators);
       for (ix=0; token != NULL; ix++) {
@@ -210,6 +213,10 @@ int inih_handler(
         current_composedmap->rawmaps = realloc(current_composedmap->rawmaps,
           sizeof(rawmap_type*) * current_composedmap->rawmaps_count);
         current_composedmap->rawmaps[ix] = current_rawmap;
+
+        current_composedmap->rawmapsv = realloc(current_composedmap->rawmapsv,
+          sizeof(char **) * current_composedmap->rawmaps_count);
+        current_composedmap->rawmapsv[ix] = current_rawmap->map;
 
         token = strtok(NULL, valid_value_separators);
       }
@@ -537,21 +544,34 @@ buf2map(
   size_t maps_count)
 {
 
-  char *byterep, *os=NULL, *new_os=NULL;
+  char *byterep=NULL, *os=NULL, *new_os=NULL;
   int inctr=0, ossz=0, insertpt=0, mapnum;
-  size_t septerm_longest=0;
+  size_t septerm_longest=0, separator_sz=0, terminator_sz=0, byterep_sz=0;
   unsigned int singlebyte;
+
+  dbgprintf("buf2map("
+    "\n  unsigned char buffer (undisplayable)," 
+    "\n  size_t buflen = %zi,"
+    "\n  const char *separator = %s,"
+    "\n  const char *terminator = %s,"
+    "\n  char ***maps (out parameter),"
+    "\n  size_t maps_count (out parameter))\n", 
+    buflen, separator, terminator);
 
   if (maps_count == 0) {
     fprintf(stderr, "Tried to map a buffer without passing any maps.\n");
     return NULL;
   }
 
-  if (strlen(separator) > strlen(terminator)) {
-    septerm_longest = strlen(separator);
+  if (separator)  { separator_sz  = strlen(separator);  }
+  if (terminator) { terminator_sz = strlen(terminator); }
+
+  if (separator_sz > terminator_sz) {
+    septerm_longest = separator_sz;
   }
   else {
-    septerm_longest = strlen(terminator) +1; // +1 for the terminating \0
+    // +1 for the \0 that will terminate the mapped string
+    septerm_longest = terminator_sz +1; 
   }
 
   for (inctr=0; inctr<buflen; inctr++) {
@@ -559,9 +579,10 @@ buf2map(
 
     mapnum = inctr % maps_count;
     byterep = (char*) maps[mapnum][singlebyte];
+    byterep_sz = strlen(byterep);
 
     insertpt = ossz;
-    ossz += strlen(byterep) + septerm_longest;
+    ossz += byterep_sz + septerm_longest;
 
     // using new_os, we can make sure to free memory before returning NULL if
     // the realloc() call fails
@@ -573,14 +594,14 @@ buf2map(
     }
     os = new_os;
 
-    memcpy(os +insertpt, byterep, strlen(byterep));
-    insertpt += strlen(byterep);
+    memcpy(os +insertpt, byterep, byterep_sz);
+    insertpt += byterep_sz;
 
     if (inctr != buflen-1) {
-      memcpy(os +insertpt, separator, strlen(separator));
+      memcpy(os +insertpt, separator, separator_sz);
     }
     else {
-      memcpy(os +insertpt, terminator, strlen(terminator)+1); // +1 for terminating \0
+      memcpy(os +insertpt, terminator, terminator_sz +1); // +1 for terminating \0
     }
 
   }

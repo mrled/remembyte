@@ -16,7 +16,7 @@ typedef struct action_struct {
   int argc;
   char **argv;
   composedmap_type *cmap;
-  int (*func) (composedmap_type*, int, char*[]);
+  int (*func) (configuration_type*, composedmap_type*, int, char*[]);
 } action_type;
 
 action_type *action_new() {
@@ -63,6 +63,7 @@ void exprintf(int exitcode, bool showhelp, const char * format, ...) {
 }
 
 int do_ssh_action(
+  configuration_type *config,
   composedmap_type *cmap,
   int argc, 
   char *argv[]) 
@@ -177,6 +178,7 @@ int do_ssh_action(
 }
 
 int do_input_action(
+  configuration_type *config,
   composedmap_type *cmap,
   int argc, 
   char *argv[]) 
@@ -221,6 +223,7 @@ int do_input_action(
 }
 
 int do_stdin_action(
+  configuration_type *config,
   composedmap_type *cmap,
   int argc, 
   char *argv[]) 
@@ -270,10 +273,11 @@ int do_stdin_action(
   dbgprintf("do_stdin_action() input: '%s'\n", instring);
 
   input_argv[0] = instring;
-  return do_input_action(cmap, 1, input_argv);
+  return do_input_action(config, cmap, 1, input_argv);
 }
 
 int do_map_action(
+  configuration_type *config,
   composedmap_type *cmap,
   int argc, 
   char *argv[]) 
@@ -287,7 +291,7 @@ int do_map_action(
     return -1;
   }
 
-  print_configuration_type();
+  print_configuration_type(config, 1);
 
   buffer = malloc(sizeof(unsigned char) * 256);
   for (ix=1; ix<256; ix++) {
@@ -306,6 +310,7 @@ int do_map_action(
 }
 
 int do_help_action(
+  configuration_type *config,
   composedmap_type *cmap,
   int argc, 
   char *argv[]) 
@@ -339,7 +344,7 @@ char *find_default_configfile() {
 action_type *remembyte_optparse(
   int argc, 
   char *argv[],
-  configuration_type *config)
+  configuration_type **config)
 {
 /*  
 void remembyte_optparse(
@@ -416,19 +421,19 @@ void remembyte_optparse(
     action->argv[ action->argc -1] = argument;
   }
 
-  config = process_configfile(configfile);
-  if (!config) {
-    exprintf(-1, false, "Could not load config file.\n");
+  *config = process_configfile(configfile);
+  if (!*config) {
+    exprintf(-1, false, "Could not load config file from '%s'.\n", configfile);
   }
 
   if (mapname) {
-    action->cmap = a2composedmap_type(mapname, config);
+    action->cmap = a2composedmap_type(mapname, *config);
     if (!action->cmap) {
       exprintf(-1, false, "No such mapping name '%s'\n", mapname);
     }
   }
   else {
-    action->cmap = get_default_map(config);
+    action->cmap = get_default_map(*config);
     if (!action->cmap) {
       exprintf(-1, false, "No map name provided on command line, and no "
         "default mapping provided in config file.\n");
@@ -453,7 +458,7 @@ int main(int argc, char *argv[]) {
    */
   action_type *action;
   int actionret;
-  configuration_type *configuration = configuration_new();
+  configuration_type *configuration;
   composedmap_type cmap;
 
   ARGV0 = argv[0];
@@ -463,9 +468,9 @@ int main(int argc, char *argv[]) {
   remembyte_optparse(argc, argv, configuration, &cmap, &(action),
     action_argc, action_argv);
   */
-  action = remembyte_optparse(argc, argv, configuration);
+  action = remembyte_optparse(argc, argv, &configuration);
   
-  actionret = action->func(&cmap, action->argc, action->argv);
+  actionret = action->func(configuration, action->cmap, action->argc, action->argv);
   return actionret;
 }
 

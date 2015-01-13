@@ -3,10 +3,12 @@
 #include <string.h>
 #include <stdbool.h>
 
+#ifdef REMEMBYTE_SUPPORT_SSH
 #include <libssh/libssh.h>
+#include "act_ssh.h"
+#endif
 
 #include "bytemaps.h"
-#include "act_ssh.h"
 #include "util.h"
 
 char *ARGV0;
@@ -29,15 +31,17 @@ action_type *action_new() {
 }
 
 void remembyte_help() {
-  printf("%s: experiments in SSH key fingerprint display\n", ARGV0);
+  printf("%s: experiments in byte-array display\n", ARGV0);
   printf("%s [-mFDh] [SUBCOMMAND] [SUBCOMMAND OPTIONS]\n", ARGV0);
   printf("    -m MAPNAME. Maps are defined in the config file\n");
   printf("    -F CONFIGFILE. Default is ~/.remembyte.conf\n");
   printf("    -D: enable debug mode\n");
   printf("    -h: display this message\n");
   printf("    SUBCOMMAND: one of the following:\n");
+#ifdef REMEMBYTE_SUPPORT_SSH
   printf("     -  ssh: connects to an SSH server and prints a key fingerprint\n");
   printf("        arguments: [HOSTNAME] [PORT]\n");
+#endif
   printf("     -  map: prints the selected map from 0x00-0xff\n");
   printf("        arguments: none\n");
   printf("     -  input: takes input on the command line\n");
@@ -62,6 +66,7 @@ void exprintf(int exitcode, bool showhelp, const char * format, ...) {
   exit(exitcode);
 }
 
+#ifdef REMEMBYTE_SUPPORT_SSH
 int do_ssh_action(
   configuration_type *config,
   composedmap_type *cmap,
@@ -176,6 +181,7 @@ int do_ssh_action(
 
   return 0;
 }
+#endif
 
 int do_input_action(
   configuration_type *config,
@@ -228,11 +234,12 @@ int do_stdin_action(
   int argc, 
   char *argv[]) 
 {
-  int chunk_max_sz=100, instring_pos, actr, wctr;
+  #define CHUNK_MAX_SZ 100
+  int instring_pos, actr, wctr;
   size_t chunk_sz;
-  //char *inchunk[chunk_max_sz], *instring, *instring_new,
+  //char *inchunk[CHUNK_MAX_SZ], *instring, *instring_new,
   //  *input_argv[1];
-  char *inchunk[chunk_max_sz], *instring, *instring_new, *input_argv[1];
+  char *inchunk[CHUNK_MAX_SZ], *instring, *instring_new, *input_argv[1];
   
 
   dbgprintf("do_stdin_action(): argc: '%i'\n", argc);
@@ -246,10 +253,10 @@ int do_stdin_action(
   }
 
   instring_pos = 0;
-  instring = malloc( sizeof(char) * chunk_max_sz);
+  instring = malloc( sizeof(char) * CHUNK_MAX_SZ);
 
   wctr = 0;
-  while (fgets((char*)inchunk, chunk_max_sz, stdin)) {
+  while (fgets((char*)inchunk, CHUNK_MAX_SZ, stdin)) {
     dbgprintf("Iteration %i... Read chunk from stdin: '%s'\n", wctr++, inchunk);
 
     chunk_sz = strlen((const char *)inchunk);
@@ -263,9 +270,9 @@ int do_stdin_action(
     memcpy(instring +instring_pos, inchunk, chunk_sz);
     instring_pos += chunk_sz;
 
-    if (strlen((char*)inchunk) < (chunk_max_sz -1)) {
-      dbgprintf("strlen(inchunk) (%i)   <   chunk_max_sz -1 (%i)\n", 
-        strlen((char*)inchunk), chunk_max_sz -1);
+    if (strlen((char*)inchunk) < (CHUNK_MAX_SZ -1)) {
+      dbgprintf("strlen(inchunk) (%i)   <   CHUNK_MAX_SZ -1 (%i)\n", 
+        strlen((char*)inchunk), CHUNK_MAX_SZ -1);
       break;
     }
   }
@@ -380,9 +387,11 @@ void remembyte_optparse(
       else if (safe_strcmp(argument, "input")) {
         action->func = do_input_action;
       }
+#ifdef REMEMBYTE_SUPPORT_SSH
       else if (safe_strcmp(argument, "ssh")) {
         action->func = do_ssh_action;
       }
+#endif
       else if (safe_strcmp(argument, "map")) {
         action->func = do_map_action;
       }
@@ -400,7 +409,7 @@ void remembyte_optparse(
         exit(0);
       }
       else if (argument[1] == 'm') {
-        mapname = strdup(argv[actr+1]);
+        mapname = safe_strdup(argv[actr+1]);
         actr++;
         continue;
       }

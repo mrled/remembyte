@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
   int inip_ret;
 
   config2 = configuration_new();
-  config2->filepath = strdup(inipath);
+  config2->filepath = safe_strdup(inipath);
   inip_ret = ini_parse(inipath, inih_handler, config2);
   printf("ini_parse() return value: %i\n", inip_ret);
   print_configuration_type(config2, 1);

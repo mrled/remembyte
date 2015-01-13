@@ -7,7 +7,9 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+#ifdef REMEMBYTE_SUPPORT_SSH
 #include <libssh/libssh.h>
+#endif
 
 #include "inih/ini.h"
 #include "util.h"

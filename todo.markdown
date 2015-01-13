@@ -80,4 +80,6 @@ This stuff is basically uncategorized at this point
 Cross platform concerns
 
 -   Abstract away some method for normalizing file paths. Fucking christ.
+-   Had to disable SDL checks under VS for ini.c (`/sdl-`) because of its use 
+    of strdup(). 
 

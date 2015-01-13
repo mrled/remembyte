@@ -29,6 +29,11 @@ Config file libraries:
 - [libconfig](http://www.hyperrealm.com/libconfig/)
 - [libconfuse](https://github.com/martinh/libconfuse)
 
+Microsoft Windows
+
+- [Using Visual Studio for Simple C Programs](http://www.swarthmore.edu/NatSci/tali/E15/Visual_C.html)n
+
+
 ## C and Unicode
 
 God damn it's a pain in the ass to figure some of this shit out. 

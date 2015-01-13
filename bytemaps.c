@@ -43,7 +43,7 @@ rawmap_type *rawmap_new() {
 configuration_type *process_configfile(const char * filename) {
   configuration_type *config;
   config = configuration_new();
-  config->filepath = strdup(filename);
+  config->filepath = safe_strdup(filename);
   if (ini_parse(filename, inih_handler, config) < 0) {
     dbgprintf("Can't load config file '%s'\n", filename);
     config = NULL;
@@ -146,7 +146,7 @@ int inih_handler(
   }
 
   if (safe_strcmp(section, "rawmaps")) {
-    char *value2 = strdup(value);
+    char *value2 = safe_strdup(value);
     current_rawmap = a2rawmap_type(name, pconfig);
     if (!current_rawmap) {
       bytectr = 0;
@@ -155,7 +155,7 @@ int inih_handler(
         sizeof(rawmap_type*) * pconfig->rawmaps_count);
 
       current_rawmap = malloc(sizeof(rawmap_type));
-      current_rawmap->name = strdup(name);
+      current_rawmap->name = safe_strdup(name);
       pconfig->rawmaps[ pconfig->rawmaps_count -1 ] = current_rawmap;
     }
 
@@ -163,7 +163,7 @@ int inih_handler(
     //dbgprintf("bytectr: \n");
     for (; token != NULL; bytectr++) {
       //dbgprintf("  %i: '%s'\n", bytectr, token);
-      current_rawmap->map[bytectr] = strdup(token);
+      current_rawmap->map[bytectr] = safe_strdup(token);
       token = strtok(NULL, valid_value_separators);
     }
     
@@ -191,7 +191,7 @@ int inih_handler(
         sizeof(composedmap_type*) * pconfig->composedmaps_count);
 
       current_composedmap = malloc(sizeof(composedmap_type));
-      current_composedmap->name = strdup(cmname);
+      current_composedmap->name = safe_strdup(cmname);
       current_composedmap->rawmaps_count = 0;
       current_composedmap->rawmaps = NULL;
       current_composedmap->rawmapsv = NULL;
@@ -201,7 +201,7 @@ int inih_handler(
 
     if (safe_strcmp(name, "rawmaps")) {
       
-      char *value2 = strdup(value);
+      char *value2 = safe_strdup(value);
 
       // TODO: I don't think my code handles multiple lines in this section
 
@@ -227,7 +227,7 @@ int inih_handler(
     else if (safe_strcmp(name, "separator") || 
       safe_strcmp(name, "terminator")) 
     {
-      char *value2 = strdup(value);
+      char *value2 = safe_strdup(value);
       char *v2idx = value2;
 
       // Remove initial double quote marks
@@ -240,10 +240,10 @@ int inih_handler(
       }
 
       if (safe_strcmp(name, "separator")) {
-        current_composedmap->separator = strdup(v2idx);
+        current_composedmap->separator = safe_strdup(v2idx);
       }
       else if (safe_strcmp(name, "terminator")) {
-        current_composedmap->terminator = strdup(v2idx);
+        current_composedmap->terminator = safe_strdup(v2idx);
       }
       
       free(value2);

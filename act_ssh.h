@@ -33,4 +33,4 @@ bool print_banners(ssh_banners*);
 int get_hostkey_fingerprint(ssh_session, ssh_hostkeys*);
 //bool print_hostkey_fingerprint(ssh_hostkeys*, mapping_t);
 
-#endif
+#endif // _ACT_SSH_H

@@ -33,6 +33,26 @@ bool safe_strcmp(const char * str1, const char * str2) {
 }
 
 
+/* Cross-platform-ly find a user's home directory
+ * 
+ * TODO: ideally, on Windows, resolve_path() would find a file in either 
+ *       %HOME% _or_ %USERPROFILE%, but if the former exists, the latter will 
+ *       not be checked at all.
+ */
+char *get_home_directory() {
+  char *homepath = NULL;
+#if defined(REMEMBYTE_OS_UNIX)
+  homepath = getenv("HOME");
+#elif defined(REMEMBYTE_OS_WINDOWS)
+  size_t homepath_sz;
+  _dupenv_s(&homepath, &homepath_sz, "HOME");
+  if (!homepath) {
+    _dupenv_s(&homepath, &homepath_sz, "USERPROFILE");
+  }
+#endif 
+  return homepath;
+}
+
 /* Of course the fucking standard doesn't have a cross-platform way to resolve
  * a fucking path
  * 
@@ -43,12 +63,12 @@ char * resolve_path(const char * path)
 {
   char *resolved, *query;
 
-  query = strdup(path);
+  query = safe_strdup(path);
 
   // Check for ~
   if (path[0] == '~') {
-    char *home;
-    home = getenv("HOME");
+    char *home = get_home_directory();
+
     if (!home) {
       fprintf(stderr, "Could not find HOME variable\n");
       return NULL;
@@ -87,4 +107,15 @@ bool str2bool(char *str) {
   else {
     return false;
   }
+}
+
+/* Copy a string
+ * 
+ * strdup() is a POSIX thing, apparently
+ */
+char *safe_strdup(char *string) {
+  char *string_copy;
+  string_copy = malloc(strlen(string));
+  memcpy(string_copy, string, strlen(string));
+  return string_copy;
 }

@@ -292,6 +292,11 @@ void print_configuration_type(
     verbosity = 1;
   }
 
+  if (!config) {
+    printf("Tried to print configuration, but pointer was NULL.\n");
+    return;
+  }
+
   if (config->filepath) {
     fp_text = config->filepath;
   }

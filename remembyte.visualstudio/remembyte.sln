@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30501.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "remembyte", "remembyte\remembyte.vcxproj", "{4220B98A-F5AE-43E5-879D-14183B415997}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tini", "tini\tini.vcxproj", "{67230814-F1D2-41D3-935A-073153E4BC0F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4220B98A-F5AE-43E5-879D-14183B415997}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4220B98A-F5AE-43E5-879D-14183B415997}.Debug|Win32.Build.0 = Debug|Win32
+		{4220B98A-F5AE-43E5-879D-14183B415997}.Release|Win32.ActiveCfg = Release|Win32
+		{4220B98A-F5AE-43E5-879D-14183B415997}.Release|Win32.Build.0 = Release|Win32
+		{67230814-F1D2-41D3-935A-073153E4BC0F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{67230814-F1D2-41D3-935A-073153E4BC0F}.Debug|Win32.Build.0 = Debug|Win32
+		{67230814-F1D2-41D3-935A-073153E4BC0F}.Release|Win32.ActiveCfg = Release|Win32
+		{67230814-F1D2-41D3-935A-073153E4BC0F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

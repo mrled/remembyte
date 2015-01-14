@@ -82,4 +82,7 @@ Cross platform concerns
 -   Abstract away some method for normalizing file paths. Fucking christ.
 -   Had to disable SDL checks under VS for ini.c (`/sdl-`) because of its use 
     of strdup(). 
+-   Ended up just disabling SDL checks under VS (`/sdl-`) altogether. These 
+    should be reenabled and all warnings fixed. `inih` library triggers one of
+    these, so it will need to be modified too. 
 

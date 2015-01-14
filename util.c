@@ -11,6 +11,7 @@ void dbgprintf(const char *format, ...) {
   }
 }
 
+
 // Why the fuck don't these exist in the standard
 bool safe_strncmp(const char * str1, const char * str2, size_t len) {
   if ((strlen(str1) >= len) &&
@@ -41,9 +42,9 @@ bool safe_strcmp(const char * str1, const char * str2) {
  */
 char *get_home_directory() {
   char *homepath = NULL;
-#if defined(REMEMBYTE_OS_UNIX)
+#if REMEMBYTE_OS == REMEMBYTE_OS_UNIX
   homepath = getenv("HOME");
-#elif defined(REMEMBYTE_OS_WINDOWS)
+#elif REMEMBYTE_OS == REMEMBYTE_OS_WINDOWS
   size_t homepath_sz;
   _dupenv_s(&homepath, &homepath_sz, "HOME");
   if (!homepath) {
@@ -92,8 +93,14 @@ char * resolve_path(const char * path)
     }
   }
 
-  // TODO: this isn't cross platform yet
+#if REMEMBYTE_OS == REMEMBYTE_OS_POSIX
   resolved = realpath(query, NULL);
+#elif REMEMBYTE_OS == REMEMBYTE_OS_WINDOWS
+  // TODO: This means the max path length on Windows that we can deal with is
+  //       260 chars. Should use newer APIs to deal with longer paths here.
+  resolved = malloc(_MAX_PATH);
+  _fullpath(resolved, query, _MAX_PATH);
+#endif
 
   return resolved;
 }
@@ -115,7 +122,8 @@ bool str2bool(char *str) {
  */
 char *safe_strdup(char *string) {
   char *string_copy;
-  string_copy = malloc(strlen(string));
-  memcpy(string_copy, string, strlen(string));
+  int buffer_sz = strlen(string) +1; // +1 for \0
+  string_copy = malloc(buffer_sz);
+  memcpy(string_copy, string, buffer_sz);
   return string_copy;
 }

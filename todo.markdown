@@ -17,10 +17,7 @@ v0.2 (basic feature completeness):
 -   display pgp mapping @done
 -   add '-a' flag to specify action @done
 -   connect to TLS services (https, imaps, etc) and display cert fingerprints
--   move from statically defined mappings to externally defined mappings
-    -   put map files somewhere. have config file that associates map(s), a 
-        terminator, & a seperator w/ a name. get_display_hash() looks these up
-        by a name the user will pass on the cli.
+-   move from statically defined mappings to externally defined mappings @done
 -   take input buffer on the cli
     -   accept it via a switch @done
     -   accept it via a pipe
@@ -41,15 +38,15 @@ v1.0 (completeness and correctness):
 -   build a library that can be used from any program
     -   step one: implement generic buf2map() function @done
     -   step other ones: ???
--   build on Windows with cl.exe and nmake.exe
+-   build on Windows with cl.exe and nmake.exe -- or via VS directly maybe?
 -   build on Unix with (at least) clang and make
 -   get some sort of build system that generates makefiles or whatever
 
 v1.1 (distribution):
 
--   submit a NuGet package to Chocolatey for consideration
--   submit an apt package to debian for consideration
--   create a homebrew tap
+-   package for NuGet
+-   package for APT
+-   package a homebrew "tap"
 
 v2.0 (and beyond):
 

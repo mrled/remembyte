@@ -76,3 +76,30 @@ He does go on to explain some cases where you could use wchar_t, but they are no
 > you're looking for are ASCII.
 
 
+## Remembyte's build system
+
+This is still a work in progress, I haven't decided anything for certain at this point.
+
+My plan is to create a Makefile that works on OS X, Linux, and BSD `make` programs out of the box. In addition, I will maintain an XCode project and a Visual Studio solution. 
+
+This lets me use the debugging and correctness-checking methods that are standard for each platform that I use. As a new C programmer, I've found XCode's Project -> Analyze and Visual Studio's SDL warnings and debugger to be *extremely* helpful in finding errors I don't yet know enough to look for. Furthermore, it means that a developer familiar with the normal practices on any one environment can download my project and view it with tools they are accustomed to. 
+
+### A universal Makefile?
+
+That's not to say that the idea of a single, platform-agnostic Makefile doesn't appeal to me. I do almost all my editing outside of the IDEs, and being able to compile it on the command line, no matter the platform, is appealing to me. 
+
+My original plan was to use make in this way. And I still could. But honestly, dealing with three make variants (GNU on Linux and OS X, BSD on the BSDs, and nmake on Windows) plus two IDE build systems (XCode and Visual Studio) sounds like an even bigger pain in the ass. 
+
+Plus, relying on nmake on Windows seems a little weird. From my reading, it looks like nmake is just there for legacy projects; Microsoft intends for you to use MSBuild for new ones. And then there's the pain in the ass that is the "Visual Studio Command Prompt", which is apparently the best thing Microsoft could come up with.
+
+### What about tests? 
+
+This might change immediately because how I do tests impacts how difficult it is to keep those IDE projects in sync with my Makefile. If the tests are all in separate .c files, I'll have to add them to the IDE projects every time I create a new one, which sounds suuuuper fun. 
+
+I may keep the IDE projects around, just for their analysis and debugging capabilities, and rely on a Makefile to run my tests. 
+
+### Other options
+
+- `autoconf`: fuck no, even if it wasn't limited to MinGW or Cygwin on Windows
+- GNU `make` everywhere: impossible if I want to avoid MinGW 
+- `CMake`: maybe. I don't like the idea of another tool, but it is *one* syntax for all platforms

@@ -1,17 +1,72 @@
 #include "act_ssh.h"
 
-// TODO: this should be a pointer
 // TODO: need a corresponding _free()
 // TODO: names in this file shouldn't look like libssh function names
 // TODO: iterate over libssh for keytypes
-ssh_hostkeys ssh_hostkeys_new() {
-  ssh_hostkeys hk;
-  hk.count = HOSTKEY_COUNT;
-  hk.keytypes[0] = "ecdsa-sha2-nistp256";
-  hk.keytypes[1] = "ssh-dss";
-  hk.keytypes[2] = "ssh-rsa";
-  hk.keylengths[hk.count] = 0;
+
+ssh_hostkeys *ssh_hostkeys_new() {
+  ssh_hostkeys *hk=NULL;
+  hk = malloc(sizeof(ssh_hostkeys));
+  check_mem(hk);
+  hk->count = HOSTKEY_COUNT;
+  hk->keytypes[0] = "ecdsa-sha2-nistp256";
+  hk->keytypes[1] = "ssh-dss";
+  hk->keytypes[2] = "ssh-rsa";
+  hk->keylengths[hk->count] = 0;
   return hk;
+
+error:
+  free(hk);
+  return NULL;
+}
+
+void ssh_hostkeys_free(ssh_hostkeys *hk) {
+  free(hk);
+}
+
+ssh_banners *ssh_banners_new() {
+  ssh_banners *ban=NULL;
+  ban = malloc(sizeof(ssh_banners));
+  check_mem(ban);
+
+  ban->issue_banner = NULL;
+  ban->server_banner = NULL;
+  ban->openssh_version = 0;
+  ban->disconnect_message = NULL;
+
+error:
+  free(ban);
+  return NULL;
+}
+
+/* Take an integer from ssh_get_openssh_version() and print the version it 
+ * represents in dot notation (e.g. 1.2.3)
+ * 
+ * This is useful because the verison is bitwise-shifted... in libssh.h, a 
+ * macro is defined to do the shifting: 
+ *
+ *     #define SSH_VERSION_INT(a, b, c) ((a) << 16 | (b) << 8 | (c))
+ *
+ * But since I don't see one for getting the dot notation from the int, I wrote
+ * one myself.
+ */
+char *osshv2a(int osshv) {
+  int major, minor, patch, major_mask, minor_mask, patch_mask;
+  char *vstr;
+
+  major_mask = 255 << 16;
+  minor_mask = 255 << 8;
+  patch_mask = 255;
+
+  major = (osshv & major_mask) >> 16;
+  minor = (osshv & minor_mask) >> 8;
+  patch = osshv & patch_mask;
+
+  // TODO: error check this
+  // TODO: can't use snprintf in real code
+  vstr = malloc(300);
+  snprintf(vstr, 200, "%i.%i.%i\n", major, minor, patch);
+  return vstr;
 }
 
 /**
@@ -22,32 +77,34 @@ ssh_hostkeys ssh_hostkeys_new() {
  * @return -1 for failures, 0 for successes
  */
 int get_banners(ssh_session session, ssh_banners *banners) {
-  if (ssh_connect(session) != SSH_OK) {
-    char *hostname; 
-    unsigned int port;
-    ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
-    ssh_options_get_port(session, &port);
-    fprintf(stderr, "Error connecting to %s:%u - %s\n",
-      hostname, port, ssh_get_error(session));
-    return -1;
-  }
+  char *hostname = NULL;
+  unsigned int port = 0;
 
-  /* TODO: why doesn't ssh_get_issue_banner work? 
-   * I can set a banner that openssh will display but this won't.
-   */
+  ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
+  ssh_options_get_port(session, &port);
+
+  check(session != SSH_OK, "Error connecting to %s:%u - '%s'", 
+    hostname, port, ssh_get_error(session));
+
+  // TODO: why doesn't ssh_get_issue_banner work? 
+  // I can set a banner that openssh will display but this won't.
   banners->issue_banner = ssh_get_issue_banner(session);
   banners->server_banner = ssh_get_serverbanner(session);
 
-  /* TODO: parse OpenSSH version so it returns the real version.
-   * I have no idea what this value is returning??
-   */
-  banners->openssh_version = ssh_get_openssh_version(session);
+  banners->openssh_version_int = ssh_get_openssh_version(session);
+  banners->openssh_version = osshv2a(banners->openssh_version_int);
 
   /* This does not actually initiate a disconnect.*/
   banners->disconnect_message = ssh_get_disconnect_message(session);
 
   ssh_disconnect(session);
+
+  // TODO: Free memory here duh
+
   return 0;
+
+error:
+  return -1;
 }
 
 bool print_banners(ssh_banners *banners) {

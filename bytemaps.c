@@ -406,12 +406,6 @@ error:
 //inline int hit2int(char hit) {
 int hit2int(char hit) {
   check((('0'<=hit<='9') && ('a'<=hit<='f')), "Bad argument: '%c'", hit);
-  /*
-  if (! (('0'<=hit<='9') || ('a'<=hit<='f'))) {
-    fprintf(stderr, "Bad argument to hit2int(): '%c'\n", hit);
-    return -1;
-  }
-  */
   return ((hit) <= '9' ? (hit) - '0' : (hit) - 'a' + 10);
 error:
   return -1;

@@ -58,7 +58,7 @@ int do_ssh_action(
 {
   int actr, bctr;
   char *hostname, *port, *dhash, *argument;
-  ssh_hostkeys hostkeys;
+  ssh_hostkeys *hostkeys;
   ssh_banners banners;
   ssh_session session=NULL;
 
@@ -81,6 +81,7 @@ int do_ssh_action(
   }
 
   hostkeys = ssh_hostkeys_new();
+  check_mem(hostkeys);
 
   session = ssh_new();
   check(session, "Error creating libssh session - '%s'", 
@@ -116,7 +117,7 @@ int do_ssh_action(
   }
 
   if (banners.openssh_version) {
-    printf("OpenSSH version: %i.\n", banners.openssh_version);
+    printf("OpenSSH version: %s.\n", banners.openssh_version);
   }
   else {
     printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
@@ -130,29 +131,30 @@ int do_ssh_action(
   }
 
   // Print SSH host key fingerprints: 
-  check(get_hostkey_fingerprint(session, &hostkeys) == 0, 
+  check(get_hostkey_fingerprint(session, hostkeys) == 0, 
     "Error getting hostkey fingerprints.\n");
 
-  for (actr=0; actr< hostkeys.count; actr++) {
-    if (hostkeys.keylengths[actr]) {
-      dhash = get_display_hash(hostkeys.keyvalues[actr], 
-        hostkeys.keylengths[actr], cmap);
+  for (actr=0; actr< hostkeys->count; actr++) {
+    if (hostkeys->keylengths[actr]) {
+      dhash = get_display_hash(hostkeys->keyvalues[actr], 
+        hostkeys->keylengths[actr], cmap);
       check(dhash, "Error getting the mapped buffer")
-      printf("%s (%s)\n", dhash, hostkeys.keytypes[actr]);
+      printf("%s (%s)\n", dhash, hostkeys->keytypes[actr]);
       free(dhash);
     }
     else {
-      printf("No key of type %s.\n", hostkeys.keytypes[actr]);
+      printf("No key of type %s.\n", hostkeys->keytypes[actr]);
     }
   }
 
+  ssh_free(session);
+  ssh_hostkeys_free(hostkeys);
   return 0;
 
 error:
   //TODO: need to free the banners struct
-  //TODO: need to free the hostkeys struct
-  // (Waiting for changes in ssh module)
   ssh_free(session);
+  ssh_hostkeys_free(hostkeys);
   return -1;
 }
 

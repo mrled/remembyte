@@ -13,7 +13,8 @@
 typedef struct _ssh_banners {
   const char *issue_banner;
   const char *server_banner;
-  int openssh_version;
+  char *openssh_version;
+  int openssh_version_int;
   const char *disconnect_message;
 } ssh_banners; 
 
@@ -25,7 +26,10 @@ typedef struct _ssh_hostkeys {
   size_t keylengths[];
 } ssh_hostkeys;
 
-ssh_hostkeys ssh_hostkeys_new();
+ssh_hostkeys *ssh_hostkeys_new();
+void ssh_hostkeys_free(ssh_hostkeys*);
+
+char *osshv2a(int);
 
 int get_banners(ssh_session, ssh_banners*);
 bool print_banners(ssh_banners*);

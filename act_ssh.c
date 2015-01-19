@@ -1,5 +1,9 @@
 #include "act_ssh.h"
 
+// TODO: this should be a pointer
+// TODO: need a corresponding _free()
+// TODO: names in this file shouldn't look like libssh function names
+// TODO: iterate over libssh for keytypes
 ssh_hostkeys ssh_hostkeys_new() {
   ssh_hostkeys hk;
   hk.count = HOSTKEY_COUNT;

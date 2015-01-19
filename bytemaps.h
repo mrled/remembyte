@@ -9,6 +9,7 @@
 
 #include <libssh/libssh.h>
 
+#include "dbg.h"
 #include "inih/ini.h"
 #include "util.h"
 

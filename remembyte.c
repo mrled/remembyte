@@ -8,9 +8,9 @@
 #include "bytemaps.h"
 #include "act_ssh.h"
 #include "util.h"
+#include "dbg.h"
 
 char *ARGV0;
-bool DEBUGMODE; // extern defined in util.h
 
 typedef struct action_struct {
   int argc;
@@ -21,11 +21,16 @@ typedef struct action_struct {
 
 action_type *action_new() {
   action_type *action = malloc(sizeof(action_type));
+  check_mem(action);
   action->argc = 0;
   action->argv = NULL;
   action->cmap = composedmap_new();
+  check_mem(action->cmap);
   action->func = NULL;
   return action;
+error:
+  free(action);
+  return NULL;
 }
 
 void remembyte_help() {
@@ -33,7 +38,6 @@ void remembyte_help() {
   printf("%s [-mFDh] [SUBCOMMAND] [SUBCOMMAND OPTIONS]\n", ARGV0);
   printf("    -m MAPNAME. Maps are defined in the config file\n");
   printf("    -F CONFIGFILE. Default is ~/.remembyte.conf\n");
-  printf("    -D: enable debug mode\n");
   printf("    -h: display this message\n");
   printf("    SUBCOMMAND: one of the following:\n");
   printf("     -  ssh: connects to an SSH server and prints a key fingerprint\n");
@@ -46,22 +50,6 @@ void remembyte_help() {
   printf("        arguments: none\n");
 }
 
-/* Print a string to stderr, optionally print remembyte help, and exit
- */
-void exprintf(int exitcode, bool showhelp, const char * format, ...) {
-  va_list args;
-
-  va_start(args, format);
-  vfprintf(stderr, format, args);
-  va_end(args);
-
-  if (showhelp) {
-    remembyte_help();
-  }
-
-  exit(exitcode);
-}
-
 int do_ssh_action(
   configuration_type *config,
   composedmap_type *cmap,
@@ -69,61 +57,50 @@ int do_ssh_action(
   char *argv[]) 
 {
   int actr, bctr;
-  char *hostname, *port, *dhash;
+  char *hostname, *port, *dhash, *argument;
+  ssh_hostkeys hostkeys;
+  ssh_banners banners;
+  ssh_session session=NULL;
 
-  dbgprintf("do_ssh_action(): argc: '%i'\n", argc);
-  for (actr=0; actr<argc; actr++) {
-    dbgprintf("do_ssh_action(): argv[%i]: %s\n", actr, argv[actr]);
-  }
+  log_arguments_debug(argc, argv);
 
   // Set defaults...
   hostname = "localhost";
   port = "22";
 
   for (actr=0, bctr=0; actr<argc; actr++) {
-    if (argv[actr][0] == '-') {
-      fprintf(stderr, "do_ssh_action(): Bad argument - '%s'\n", argv[actr]);
-      return -1;
-    }
+    argument = argv[actr];
+    check(argument[0] != '-', "Bad argument: '%s'", argument);
     switch (bctr) {
-      case 0: hostname = argv[actr]; break;
-      case 1:     port = argv[actr]; break;
+      case 0: hostname = argument; break;
+      case 1:     port = argument; break;
       default: 
-        fprintf(stderr, "do_ssh_action(): Bad argument - '%s'\n", 
-        argv[actr]); 
-        return -1;
+        sentinel("Bad argument: '%s'", argument);
     }
     bctr++;
   }
 
-  ssh_hostkeys hostkeys = ssh_hostkeys_new();
-  ssh_banners banners;
+  hostkeys = ssh_hostkeys_new();
 
-  ssh_session session;
   session = ssh_new();
-  if (session == NULL) {
-    fprintf(stderr, "Error creating libssh session - '%s'\n",
-      ssh_get_error(session));
-    return -1;
-  }
+  check(session, "Error creating libssh session - '%s'", 
+    ssh_get_error(session)); 
 
   ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
   ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
 
   // Test the connection & exit if it fails:
-  if (ssh_connect(session) != SSH_OK) {
-    fprintf(stderr, "Error connecting to %s:%s - %s\n",
-      hostname, port, ssh_get_error(session));
-    return -1;
-  }
+  check (ssh_connect(session) == SSH_OK, "Error connecting to %s:%s - '%s'",
+     hostname, port, ssh_get_error(session));
   ssh_disconnect(session);
 
-  // Print SSH banners:
-  if (get_banners(session, &banners) != 0) {
-    fprintf(stderr, "Error getting banners.\n");
-    return -1;
-  }
+  // Print SSH get_banners:
+  check(get_banners(session, &banners) == 0, "Error getting banners");
 
+
+  //TODO: Much of this code would be simplified if I could make sure that a 
+  //      banners struct is initialized w/ all members pointing to NULL if they
+  //      don't exist. Or if they had default values.
   if (banners.issue_banner) {
     printf("Issue banner:\n%s\n", banners.issue_banner);
   }
@@ -153,19 +130,14 @@ int do_ssh_action(
   }
 
   // Print SSH host key fingerprints: 
-  if (get_hostkey_fingerprint(session, &hostkeys) != 0) {
-    fprintf(stderr, "Error getting hostkey fingerprints.\n");
-    return -1;
-  }
+  check(get_hostkey_fingerprint(session, &hostkeys) == 0, 
+    "Error getting hostkey fingerprints.\n");
 
   for (actr=0; actr< hostkeys.count; actr++) {
     if (hostkeys.keylengths[actr]) {
       dhash = get_display_hash(hostkeys.keyvalues[actr], 
         hostkeys.keylengths[actr], cmap);
-      if (!dhash) {
-        fprintf(stderr, "Error getting mapped buffer.\n");
-        return false;
-      }
+      check(dhash, "Error getting the mapped buffer")
       printf("%s (%s)\n", dhash, hostkeys.keytypes[actr]);
       free(dhash);
     }
@@ -175,6 +147,13 @@ int do_ssh_action(
   }
 
   return 0;
+
+error:
+  //TODO: need to free the banners struct
+  //TODO: need to free the hostkeys struct
+  // (Waiting for changes in ssh module)
+  ssh_free(session);
+  return -1;
 }
 
 int do_input_action(
@@ -185,41 +164,33 @@ int do_input_action(
 {
   int actr;
   size_t buflen;
-  char *hexbuf, *mapped_buffer;
+  char *argument, *mapped_buffer;
   unsigned char *buffer;
 
-  dbgprintf("do_input_action(): argc: '%i'\n", argc);
-  for (actr=0; actr<argc; actr++) {
-    dbgprintf("do_input_action(): argv[%i]: %s\n", actr, argv[actr]);
-  }
+  log_arguments_debug(argc, argv);
 
-  if (argc == 0) {
-    exprintf(-1, true, "No argument supplied for INPUT action.\n");
-  }
+  check(argc >0, "No argument supplied for input action");
 
   for (actr=0; actr<argc; actr++) {
-    hexbuf = argv[actr];
-    // Make sure the user didn't pass us any extra options:
-    if (hexbuf[0] == '-') {
-      fprintf(stderr, "do_input_action(): Bad argument - '%s'\n", hexbuf);
-      return -1;
-    }
+    argument = argv[actr];
+
+    check(argument[0] != '-', "Bad argument: '%s'", argument);
 
     // Assume everything else is a hex string
-    buflen = hex2buf(hexbuf, &buffer);
-    if (buflen <= 0) {
-      fprintf(stderr, "ERROR: Could not decode input hex.\n");
-      return -1;
-    }
+    buflen = hex2buf(argument, &buffer);
+    check(buflen > 0, "Could not decode input hex");
 
     mapped_buffer = get_display_hash(buffer, buflen, cmap);
-    if (!mapped_buffer) {
-      exprintf(-1, false, "Failed to map buffer '%s'.\n", hexbuf);
-    }
-    printf("%s => %s\n", hexbuf, mapped_buffer);
+    check_mem(mapped_buffer); 
+    printf("%s => %s\n", argument, mapped_buffer);
   }
 
+  // TODO: do I have to free 'mapped_buffer'? 
+  // TODO: do I have to free 'buffer'? 
   return 0;
+
+error:
+  return -1;
 }
 
 int do_stdin_action(
@@ -230,50 +201,45 @@ int do_stdin_action(
 {
   int chunk_max_sz=100, instring_pos, actr, wctr;
   size_t chunk_sz;
-  //char *inchunk[chunk_max_sz], *instring, *instring_new,
-  //  *input_argv[1];
-  char *inchunk[chunk_max_sz], *instring, *instring_new, *input_argv[1];
+  char *inchunk[chunk_max_sz], *instring=NULL, *instring_new=NULL, 
+    *input_argv[1];
   
+  log_arguments_debug(argc, argv);
 
-  dbgprintf("do_stdin_action(): argc: '%i'\n", argc);
-  for (actr=0; actr<argc; actr++) {
-    dbgprintf("do_stdin_action(): argv[%i]: %s\n", actr, argv[actr]);
-  }
-
-  if (argc != 0) {
-    fprintf(stderr, "do_stdin_action(): too many arguments\n");
-    return -1;
-  }
+  check(argc == 0, "Too many arguments");
 
   instring_pos = 0;
   instring = malloc( sizeof(char) * chunk_max_sz);
 
   wctr = 0;
+  // TODO: do I have the inchunk pointer doing the right thing here? 
   while (fgets((char*)inchunk, chunk_max_sz, stdin)) {
-    dbgprintf("Iteration %i... Read chunk from stdin: '%s'\n", wctr++, inchunk);
+    log_debug("Iteration %i... Read chunk from stdin: '%s'\n", 
+      wctr++, inchunk);
 
     chunk_sz = strlen((const char *)inchunk);
     instring_new = realloc(instring, strlen(instring) + chunk_sz + 1);
-    if (!instring) {
-      fprintf(stderr, "Could not allocate memory\n");
-      free(instring);
-      return -1;
-    }
+    check_mem(instring)
     instring = instring_new;
     memcpy(instring +instring_pos, inchunk, chunk_sz);
     instring_pos += chunk_sz;
 
     if (strlen((char*)inchunk) < (chunk_max_sz -1)) {
-      dbgprintf("strlen(inchunk) (%i)   <   chunk_max_sz -1 (%i)\n", 
+      log_debug("strlen(inchunk) (%zi) < chunk_max_sz -1 (%i)\n", 
         strlen((char*)inchunk), chunk_max_sz -1);
       break;
     }
   }
 
-  dbgprintf("do_stdin_action() input: '%s'\n", instring);
+  log_debug("Found input '%s'", instring);
 
   input_argv[0] = instring;
   return do_input_action(config, cmap, 1, input_argv);
+
+error:
+  free(instring);
+  free(instring_new);
+  return -1;
 }
 
 int do_map_action(
@@ -283,30 +249,32 @@ int do_map_action(
   char *argv[]) 
 {
   int ix;
-  unsigned char * buffer;
-  char * mapped_buffer;
+  unsigned char *buffer=NULL;
+  char *mapped_buffer=NULL;
 
-  if (argc != 0) {
-    fprintf(stderr, "do_map_action(): too many arguments\n");
-    return -1;
-  }
+  check(argc == 0, "Too many arguments");
 
   print_configuration_type(config, 1);
 
   buffer = malloc(sizeof(unsigned char) * 256);
+  check_mem(buffer);
   for (ix=1; ix<256; ix++) {
     buffer[ix] = ix;
   }
 
   mapped_buffer = get_display_hash(buffer, 256, cmap);
-  if (!mapped_buffer) {
-    exprintf(-1, false, "Failed to map buffer.\n");
-  }
+  check_mem(mapped_buffer); // TODO: is this right for return val of get_display_hash() ?
+
   printf("%s\n", mapped_buffer);
 
-  free(mapped_buffer);
   free(buffer);
+  free(mapped_buffer);
   return 0;
+
+error:
+  free(buffer);
+  free(mapped_buffer);
+  return -1;
 }
 
 int do_help_action(
@@ -329,45 +297,32 @@ char *find_default_configfile() {
   for (ix=0; ix<CFLOCS_SZ; ix++) {
     found_file = resolve_path(cflocs[ix]);
     if (found_file) {
-      dbgprintf("Found default configuration file at '%s'\n", found_file);
+      log_debug("Found default configuration file at '%s'", found_file);
       return found_file;
     }
   }
-  dbgprintf("Did not find a default config file on the filesystem\n");
+  log_debug("Did not find a default config file on the filesystem\n");
   return NULL;
 }
 
 /* Parse arguments sent to remembyte
  *
  */
-
 action_type *remembyte_optparse(
   int argc, 
   char *argv[],
   configuration_type **config)
 {
-/*  
-void remembyte_optparse(
-  int argc, 
-  char *argv[], 
-  configuration_type *config,
-  composedmap_type *cmap,
-  void **action, 
-  int *action_argc, // TODO: require this to be malloc'd by the caller
-  char **action_argv)  // TODO: require this to be malloc'd by the caller
-{
-*/
+  log_arguments_debug(argc, argv);
 
   action_type *action = action_new();
   action->func = do_help_action;
 
   int actr;
-  char *argument, *mapname, *configfile;
+  char *argument, *mapname=NULL, *configfile=NULL;
 
-  mapname = NULL;
   configfile = find_default_configfile();
-
-  dbgprintf("remembyte_optparse(): argc == %i\n", argc);
+  check(configfile, "Could not find config file");
 
   // Determine what action the user has specified
   for (actr=1, action->argc=0; actr<argc; actr++) {
@@ -396,16 +351,13 @@ void remembyte_optparse(
     // Apply global flags
     if (strlen(argument) == 2 && argument[0] == '-') { 
       if (argument[1] == 'h') {
+        // TODO: Is this really what I want to do? It breaks the control flow model.
         remembyte_help();
         exit(0);
       }
       else if (argument[1] == 'm') {
         mapname = strdup(argv[actr+1]);
         actr++;
-        continue;
-      }
-      else if (argument[1] == 'D') {
-        DEBUGMODE=true;
         continue;
       }
       else if (argument[1] == 'F') {
@@ -418,59 +370,50 @@ void remembyte_optparse(
     // Any argument not parsed above goes into the action struct's argv[] array
     action->argc += 1;
     action->argv = realloc(action->argv, sizeof(char*) * action->argc );
+    check_mem(action->argv);
     action->argv[ action->argc -1] = argument;
   }
 
   *config = process_configfile(configfile);
-  if (!*config) {
-    exprintf(-1, false, "Could not load config file from '%s'.\n", configfile);
-  }
+  check(*config, "Could not load config file from '%s'", configfile);
 
   if (mapname) {
     action->cmap = a2composedmap_type(mapname, *config);
-    if (!action->cmap) {
-      exprintf(-1, false, "No such mapping name '%s'\n", mapname);
-    }
+    check(action->cmap, "No such mapping name '%s'", mapname);
   }
   else {
     action->cmap = get_default_map(*config);
-    if (!action->cmap) {
-      exprintf(-1, false, "No map name provided on command line, and no "
-        "default mapping provided in config file.\n");
-    }
+    check(action->cmap, "No map name provided on command line, and no "
+        "default mapping provided in config file.");
   }
   
   free(mapname);
-  dbgprintf("Using byte mapping '%s'\n", action->cmap->name);
-
-  for(actr=0; actr< action->argc; actr++) {
-    dbgprintf("action->argv[%i] == %s\n", actr, action->argv[actr]);
-  }
+  log_debug("Using byte mapping '%s'", action->cmap->name);
   
   return action;
+
+error: 
+  // TODO: free action
+  free(mapname);
+  return NULL;
 }
 
 int main(int argc, char *argv[]) {
-  /*
-  int (*action)(composedmap_type*, int, char**);
-  int *action_argc;
-  char **action_argv;
-   */
   action_type *action;
   int actionret;
   configuration_type *configuration;
   composedmap_type cmap;
 
   ARGV0 = argv[0];
-  DEBUGMODE = false;
 
-  /*
-  remembyte_optparse(argc, argv, configuration, &cmap, &(action),
-    action_argc, action_argv);
-  */
   action = remembyte_optparse(argc, argv, &configuration);
+  check(action, "Error parsing command line options"); // TODO: this error message doesn't cover every situation
   
   actionret = action->func(configuration, action->cmap, action->argc, action->argv);
   return actionret;
+
+error:
+  // TODO: free action
+  return -1;
 }
 

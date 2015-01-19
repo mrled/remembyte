@@ -10,8 +10,6 @@
 #include "util.h"
 #include "bytemaps.h"
 
-bool DEBUGMODE = true; // extern defined in util.h
-
 int main(int argc, char* argv[])
 {
   char *inipath = "./remembyte.conf";

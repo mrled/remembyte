@@ -8,9 +8,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-extern bool DEBUGMODE;
+#include "dbg.h"
 
-void dbgprintf(const char *, ...);
 bool safe_strcmp(const char *, const char *);
 bool safe_strncmp(const char *, const char *, size_t);
 char * resolve_path(const char *);

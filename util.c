@@ -1,16 +1,5 @@
 #include "util.h"
 
-void dbgprintf(const char *format, ...) {
-  if (DEBUGMODE) {
-    fprintf(stderr, "DBG: ");
-
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-  }
-}
-
 // Why the fuck don't these exist in the standard
 bool safe_strncmp(const char * str1, const char * str2, size_t len) {
   if ((strlen(str1) >= len) &&
@@ -39,43 +28,53 @@ bool safe_strcmp(const char * str1, const char * str2) {
  * Take a path that might contain ., .., extraneous /, or a ~ character, and 
  * return the absolute path that the user intends
  */
-char * resolve_path(const char * path)
+char * resolve_path(const char *path)
 {
-  char *resolved, *query;
+  char *resolved=NULL, *query=NULL, *home=NULL;
+  size_t path_len=0, home_len=0;
 
-  query = strdup(path);
+  path_len = strlen(path);
+  query = malloc(path_len +1);
+  check_mem(query);
+  memcpy(query, path, path_len +1);
+  log_debug("Query '%s'", query);
 
   // Check for ~
   if (path[0] == '~') {
-    char *home;
     home = getenv("HOME");
-    if (!home) {
-      fprintf(stderr, "Could not find HOME variable\n");
-      return NULL;
-    }
+    check(home, "Could not find HOME variable");
+    home_len = strlen(home);
 
-    if (strlen(path) == 1) {
+    if (path_len == 1) {
       // We were passed just a tilde and nothing else
-      return home;
+      query = strdup(home);
     }
     else if ((path[1] == '/') || (path[1] == '\\')) {
-      // We were passed a tilde and then a path seperator 
-      // such as "~/file.txt"
-      query = strcat(home, &path[1]);
+      // We were passed a tilde and then a path seperator e.g. ~/file.txt
+      realloc(query, home_len + path_len -1 +1); 
+      check_mem(query);
+      memcpy(query, home, home_len +1);
+      memcpy(query +strlen(home), &path[1], path_len -1 +1);
     }
     else {
       // We were passed a tilde and then something that wasn't a path separator
       // such as "~username/file.txt"
-      fprintf(stderr, "Error for input '%s': '~username' syntax is currently "
-        "unsupported\n", path);
-      return NULL;
+      sentinel("Error for input: '~username' syntax is currently unsupported");
     }
   }
 
   // TODO: this isn't cross platform yet
   resolved = realpath(query, NULL);
-
+  if (!resolved) {
+    log_debug("Could not resolve path for query '%s'", path);
+  }
+  free(query);
   return resolved;
+
+error:
+  free(query);
+  free(resolved);
+  return NULL;
 }
 
 bool str2bool(char *str) {

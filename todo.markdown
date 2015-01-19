@@ -73,8 +73,17 @@ This stuff is basically uncategorized at this point
     default, or has more than one default, or what if a composedmap specifies
     a rawmap that doesn't exist?
 -   Use libssh's ssh_keytypes_e enum to iterate through SSH key types
+-   Check my code for reasonable names for global things, especially 
+    preprocessor shit. Make sure I won't trample someone else if they use my 
+    code as a library.
 
 Cross platform concerns
 
 -   Abstract away some method for normalizing file paths. Fucking christ.
 
+Code sanity checker
+
+-   I'm not sure if there's actually a way to do this, but...
+-   would be cool to have a sanity checker during `make` that will fail if I
+    call `check()`, `sentinal()`, or `check_debug()` from a function without
+    an `error:` label. 

@@ -9,17 +9,21 @@ char *valid_value_separators = ", \0"; // extern defined in bytemaps.h
 configuration_type *configuration_new() {
   configuration_type *config;
   config = malloc(sizeof(configuration_type));
+  check_mem(config);
   config->filepath = NULL;
   config->rawmaps_count = 0;
   config->rawmaps = NULL;
   config->composedmaps_count = 0;
   config->composedmaps = NULL;
   return config;
+error:
+  return NULL;
 }
 
 composedmap_type *composedmap_new() {
   composedmap_type *cmap;
   cmap = malloc(sizeof(composedmap_type));
+  check_mem(cmap);
   cmap->name = "";
   cmap->isdefault = false;
   cmap->rawmaps_count = 0;
@@ -28,27 +32,35 @@ composedmap_type *composedmap_new() {
   cmap->separator = "";
   cmap->terminator = "";
   return cmap;
+error:  
+  return NULL;
 }
 
 rawmap_type *rawmap_new() {
   rawmap_type *rmap;
   rmap = malloc(sizeof(rawmap_type));
+  check_mem(rmap);
   rmap->name = "";
   return rmap;
+error:
+  return NULL;
 }
 
 /* Take in a string representing the path to a config file, parse that file, 
  * and return a pointer to a configuration_type struct representing that file.
  */
 configuration_type *process_configfile(const char * filename) {
-  configuration_type *config;
+  configuration_type *config=NULL;
   config = configuration_new();
+  check_mem(config);
   config->filepath = strdup(filename);
   if (ini_parse(filename, inih_handler, config) < 0) {
-    dbgprintf("Can't load config file '%s'\n", filename);
-    config = NULL;
+    sentinel("Can't load config file '%s'\n", filename);
   }
   return config;
+error:
+  free(config);
+  return NULL;
 }
 
 /* Take in the name of a composedmap and a configuration_type, and return a
@@ -123,8 +135,7 @@ int inih_handler(
 
   configuration_type *pconfig = (configuration_type*) configuration;
 
-  // static local variables are initialized to 0
-  static int bytectr; 
+  static int bytectr=0; 
 
   rawmap_type *current_rawmap;
   composedmap_type *current_composedmap;
@@ -133,16 +144,14 @@ int inih_handler(
 
 #ifdef REMEMBYTE_DEBUG_CONFIG_PARSER
   // This will print out each line of the config file as its being parsed:
-  static int linectr;
-  linectr +=1;
-  dbgprintf("inih_handler(): "
-    "%s (%zi) // %s (%zi) // %s (%zi). byte: %i // line: %i \n", 
+  static int linectr=0;
+  log_debug("%s (%zi) // %s (%zi) // %s (%zi). byte: %i // line: %i \n", 
     section, strlen(section), name, strlen(name), value, strlen(value), 
-    bytectr, linectr);
+    bytectr, linectr++);
 #endif
 
   if (strlen(section) == 0) {
-    dbgprintf("inih_handler(): in general section\n");
+    log_debug("In general section, but nothing to do here");
   }
 
   if (safe_strcmp(section, "rawmaps")) {
@@ -160,23 +169,14 @@ int inih_handler(
     }
 
     token = strtok( (char*)value2, valid_value_separators);
-    //dbgprintf("bytectr: \n");
     for (; token != NULL; bytectr++) {
-      //dbgprintf("  %i: '%s'\n", bytectr, token);
       current_rawmap->map[bytectr] = strdup(token);
       token = strtok(NULL, valid_value_separators);
     }
     
     free(value2);
 
-    if (bytectr == 256) { 
-    }
-    else if (bytectr > 256) {
-      dbgprintf("inih_handler(): more than 256 values for raw map. "
-        "Current bytectr == %i\n", bytectr);
-      return 0;
-    }
-
+    check(0 <= bytectr <= 256, "Bad value for bytectr: %i", bytectr) ;
   }
 
   else if (safe_strncmp(section, "composedmap", strlen("composedmap"))) {
@@ -256,16 +256,21 @@ int inih_handler(
     }
 
     else {
-      dbgprintf("Ignoring extra field in config file: '%s'\n", name);
+      log_debug("Ignoring extra field in config file: '%s'\n", name);
     }
 
   }
 
   else {
-    dbgprintf("inih_handler(): Unknown section: '%s'\n", section);
-    return 0;
+    sentinel("Unknown section '%s'", section);
   }
+
+  // TODO: Audit this function for what needs to be free()'d 
+
   return 1;
+
+error: 
+  return 0;
 }
 
 /* Print a configuration_type struct
@@ -284,11 +289,11 @@ void print_configuration_type(
   char *defaultness_text, *fp_text;
 
   if (verbosity < 0) {
-    dbgprintf("Verbosity incorrectly set to %i; changing to 0\n");
+    log_debug("Verbosity incorrectly set to %i; changing to 0", verbosity);
     verbosity = 0;
   }
   else if (verbosity > 1) {
-    dbgprintf("Verbosity incorrectly set to %i; changing to 1\n");
+    log_debug("Verbosity incorrectly set to %i; changing to 1", verbosity);
     verbosity = 1;
   }
 
@@ -362,28 +367,24 @@ void print_configuration_type(
  * @return the length of the outbuffer if successful, a negative number otherwise
  */
 size_t hex2buf(char * hexstring, unsigned char ** outbuffer) {
-  char *normhs;
-  size_t outbuffer_len;
+  char *normhs=NULL;
+  unsigned char *obuf=NULL;
+  size_t outbuffer_len=0;
 
   normhs = normalize_hexstring(hexstring);
-  if (!normhs) {
-    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
-    return -1;
-  }
+  check(normhs, "The string %s is not a hex string\n", hexstring);
 
   *outbuffer = nhex2int(normhs);
-  if (! *outbuffer) {
-    fprintf(stderr, "The string %s is not a hex string\n", hexstring);
-    return -1;
-  }
+  check(*outbuffer, "The string %s is not a hex string\n", hexstring);
 
   outbuffer_len = strlen(normhs)/2;
 
-  //dbgprintf("hex2buf(): Reconstructed hex representation of input string: "
-  //  "'%s'\n", get_display_hash(*outbuffer, outbuffer_len, HEX));
-
   free(normhs);
   return outbuffer_len;
+
+error:
+  free(normhs);
+  return -1;
 }
 
 /* Convert a hit (a _H_ex dig_IT_) to an integer 
@@ -404,11 +405,16 @@ size_t hex2buf(char * hexstring, unsigned char ** outbuffer) {
  */
 //inline int hit2int(char hit) {
 int hit2int(char hit) {
+  check((('0'<=hit<='9') && ('a'<=hit<='f')), "Bad argument: '%c'", hit);
+  /*
   if (! (('0'<=hit<='9') || ('a'<=hit<='f'))) {
     fprintf(stderr, "Bad argument to hit2int(): '%c'\n", hit);
     return -1;
   }
+  */
   return ((hit) <= '9' ? (hit) - '0' : (hit) - 'a' + 10);
+error:
+  return -1;
 }
 
 /* Normalize a string containing a hexadecimal representation of a number
@@ -423,7 +429,10 @@ int hit2int(char hit) {
 char * normalize_hexstring(char * hexstring) {
   unsigned int iidx=0, oidx=0;
   char ca, cb;
-  char * hexstring_norm = (char *) malloc(sizeof(char) * strlen(hexstring) +1);
+  char *hexstring_norm=NULL;
+
+  hexstring_norm = malloc(sizeof(char) * strlen(hexstring) +1);
+  check_mem(hexstring_norm);
 
   if (hexstring[0] == '0' && hexstring[1] == 'x') {
     iidx = 2;
@@ -437,13 +446,8 @@ char * normalize_hexstring(char * hexstring) {
     if ('A'<=ca<='F') ca = tolower(ca);
     if ('A'<=cb<='F') cb = tolower(cb);
 
-    if (hit2int(ca) <0 || hit2int(cb) <0) {
-      fprintf(stderr, "normalize_hexstring(): bad input\n");
-      free(hexstring_norm);
-      return NULL;
-    }
-
-    dbgprintf("normalize_hexstring(): ca = %c, cb = %c\n", ca, cb);
+    check((hit2int(ca) > -1 && hit2int(cb) > -1), "Bad input");
+    log_debug("ca = %c, cb = %c", ca, cb);
 
     if (ca != ':') {
       hexstring_norm[oidx] = ca;
@@ -455,9 +459,14 @@ char * normalize_hexstring(char * hexstring) {
       iidx++;
     }
   }
-  dbgprintf("Original hexstring: '%s'; normalized: '%s'\n", hexstring, (char*)hexstring_norm);
+  log_debug("Original hexstring: '%s'; normalized: '%s'", hexstring, 
+    (char*)hexstring_norm);
 
   return hexstring_norm;
+
+error:
+  free(hexstring_norm);
+  return NULL;
 }
 
 /* Convert a normalized hex string to a byte array that the hex string 
@@ -470,27 +479,28 @@ char * normalize_hexstring(char * hexstring) {
  *         represented by hexstring
  */
 unsigned char * nhex2int(char * hexstring) {
-  size_t buffer_len = strlen(hexstring) / 2;
-  unsigned char * buffer = malloc(buffer_len);
+  size_t buffer_len;
+  unsigned char *buffer=NULL;
   long ix;
   int ia, ib;
+
+  buffer_len = strlen(hexstring) / 2;
+  buffer = malloc(buffer_len);
+  check_mem(buffer);
 
   for (ix=0; ix<buffer_len; ix++) {
     ia = hit2int(hexstring[2 * ix + 0]);
     ib = hit2int(hexstring[2 * ix + 1]);
-    if (ia <0 || ib <0) {
-      free(buffer);
-      return NULL;
-    }
+    check ((ia >=0 && ib >=0), "Bad input");
     // shift ia four bits to the left, because four bits is half of one byte 
     // and ia is the first half of the byte representation.
     buffer[ix] = (ia << 4) | ib;
   }
-
-  //dbgprintf("nhex2int(): Reconstructed hex representation of input string: "
-  //  "'%s'\n", get_display_hash(buffer, buffer_len, HEX));
-
   return buffer;
+
+error:
+  free(buffer);
+  return NULL;
 }
 
 char *get_display_hash(
@@ -498,22 +508,20 @@ char *get_display_hash(
   size_t hash_len, 
   composedmap_type *cmap)
 {
-  char *mapped_buffer;
+  char *mapped_buffer=NULL;
 
-  if (!cmap) {
-    fprintf(stderr, "get_display_hash(): Bad map.\n");
-    return NULL;
-  }
+  check(cmap, "Bad map");
 
   mapped_buffer = buf2map(hash, hash_len, 
     cmap->separator, cmap->terminator, cmap->rawmapsv, cmap->rawmaps_count);
-  if (!mapped_buffer) {
-    fprintf(stderr, "Error mapping buffer.\n");
-    return NULL;
-  }
+  check(mapped_buffer, "Error mapping buffer");
 
   return mapped_buffer;
   // NOTE: Caller must free the returned pointer
+
+error:
+  free(mapped_buffer);
+  return NULL;
 }
 
 /**
@@ -543,25 +551,23 @@ buf2map(
   char *** maps,
   size_t maps_count)
 {
-
   char *byterep=NULL, *os=NULL, *new_os=NULL;
   int inctr=0, ossz=0, insertpt=0, mapnum;
   size_t septerm_longest=0, separator_sz=0, terminator_sz=0, byterep_sz=0;
   unsigned int singlebyte;
 
-  dbgprintf("buf2map("
-    "\n  unsigned char buffer (undisplayable)," 
-    "\n  size_t buflen = %zi,"
-    "\n  const char *separator = %s,"
-    "\n  const char *terminator = %s,"
-    "\n  char ***maps (out parameter),"
-    "\n  size_t maps_count (out parameter))\n", 
+#ifdef REMEMBYTE_DEBUG_BUF2MAP
+  log_debug("Arguments: "
+    "\n  unsigned char buffer = (undisplayable)," 
+    "\n  size_t buflen = '%zi',"
+    "\n  const char *separator = '%s',"
+    "\n  const char *terminator = '%s',"
+    "\n  char ***maps = (out parameter),"
+    "\n  size_t maps_count = (out parameter))", 
     buflen, separator, terminator);
+#endif 
 
-  if (maps_count == 0) {
-    fprintf(stderr, "Tried to map a buffer without passing any maps.\n");
-    return NULL;
-  }
+  check(maps_count >= 0, "Tried to map a buffer without passing any maps");
 
   if (separator)  { separator_sz  = strlen(separator);  }
   if (terminator) { terminator_sz = strlen(terminator); }
@@ -584,14 +590,8 @@ buf2map(
     insertpt = ossz;
     ossz += byterep_sz + septerm_longest;
 
-    // using new_os, we can make sure to free memory before returning NULL if
-    // the realloc() call fails
     new_os = realloc(os, ossz); 
-    if (! new_os) {
-      fprintf(stderr, "Could not allocate memory.\n");
-      free(os);
-      return NULL;
-    }
+    check_mem(new_os);
     os = new_os;
 
     memcpy(os +insertpt, byterep, byterep_sz);
@@ -607,5 +607,10 @@ buf2map(
   }
   return os;
   // NOTE: Caller must free the returned pointer
+
+error:
+  free(os);
+  free(new_os);
+  return NULL;
 }
 

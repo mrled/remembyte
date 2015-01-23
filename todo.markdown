@@ -80,6 +80,11 @@ This stuff is basically uncategorized at this point
 Cross platform concerns
 
 -   Abstract away some method for normalizing file paths. Fucking christ.
+-   Make a cross-platform function that counts the number of characters in a 
+    format string + arguments. 
+    On Windows, can just call `count = _scprintf()`:
+    <https://msdn.microsoft.com/en-us/library/vstudio/t32cf9tb(v=vs.100).aspx>
+    On Unix, can use `count = snprintf(NULL, 0, char *fmt, ...)`
 
 Code sanity checker
 

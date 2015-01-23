@@ -4,19 +4,51 @@
 // TODO: names in this file shouldn't look like libssh function names
 // TODO: iterate over libssh for keytypes
 
+
+/* In libssh.h: 
+
+enum ssh_keytypes_e{
+  SSH_KEYTYPE_UNKNOWN=0,
+  SSH_KEYTYPE_DSS=1,
+  SSH_KEYTYPE_RSA,
+  SSH_KEYTYPE_RSA1,
+  SSH_KEYTYPE_ECDSA,
+  SSH_KEYTYPE_ED25519
+};
+
+ * TODO: My understanding of SSH key names in libssh is not yet complete
+ * Like, search the codebase for ecdsa-sha2-nistp256 for example
+ * This doesn't seem to expose keys like that
+ * Also it seems if I pass that key type to ssh_options_set as in:
+
+    ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, "ecdsa-sha2-nistp256");
+
+ * ... it works? But it doesn't get returned for anything from 
+ * ssh_key_type_to_char() ?
+  */
 ssh_hostkeys *ssh_hostkeys_new() {
   int ix;
+  char *hktype_name;
 
   ssh_hostkeys *hk=NULL;
   hk = malloc(sizeof(ssh_hostkeys));
   check_mem(hk);
-  hk->count = HOSTKEY_COUNT;
-  hk->keytypes[0] = "ecdsa-sha2-nistp256";
-  hk->keytypes[1] = "ssh-dss";
-  hk->keytypes[2] = "ssh-rsa";
-  for (ix=0; ix< hk->count; ix++) {
+  
+  hk->count = SSH_KEYTYPE_ECDSA;
+
+  hk->keytypes = malloc(sizeof(int) * hk->count);
+  hk->keyvalues = malloc(sizeof(unsigned char*) * hk->count);
+  hk->keylengths = malloc(sizeof(size_t) * hk->count);
+
+  for (ix=0; ix <= hk->count; ix++) {
+    hktype_name = (char *) ssh_key_type_to_char(ix);
+    log_debug("Looking for library support for host keys of type %s "
+      "(enum value %i)", hktype_name, ix);
+
+    hk->keytypes[ix] = ix;
     hk->keylengths[ix] = 0;
   }
+
   return hk;
 
 error:
@@ -120,29 +152,34 @@ error:
  * @return -1 for failures, 0 for successes
  */
 int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
-
   int kctr, rc, ix;
   ssh_key pubkey = NULL;
-
   size_t hkhash_buf_len;
   unsigned char *hkhash_buf;
+  char *hktype_name;
 
   for (kctr=0; kctr < hostkeys->count; kctr++) {
 
+    hktype_name = (char *) ssh_key_type_to_char(hostkeys->keytypes[kctr]);
     hkhash_buf = (unsigned char*)"";
     hkhash_buf_len = 0;
 
-    rc = ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys->keytypes[kctr]);
-    check(rc == 0, "Error setting SSH option for host key '%s': %s\n", 
-      hostkeys->keytypes[kctr], ssh_get_error(session));
+    rc = ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hktype_name);
+    if (rc != 0) {
+      log_debug("libssh apparently doesn't support the %s algorithm?",
+        hktype_name);
+      continue;
+    }
+    //check(rc == 0, "Error (%i) setting SSH option for host key '%s': %s\n", 
+    //  rc, hktype_name, ssh_get_error(session));
 
     rc = ssh_connect(session);
     if (rc != SSH_OK) {
-      log_debug("Server does not support type %s", hostkeys->keytypes[kctr]);
+      log_debug("Server does not support type %s", hktype_name);
     }
 
     else {
-      log_debug("Found server key of type %s", hostkeys->keytypes[kctr]);
+      log_debug("Found server key of type %s", hktype_name);
 
       rc = ssh_get_publickey(session, &pubkey);
       check(rc == SSH_OK, "Error getting public key: %s\n", 

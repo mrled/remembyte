@@ -18,12 +18,12 @@ typedef struct _ssh_banners {
   const char *disconnect_message;
 } ssh_banners; 
 
-#define HOSTKEY_COUNT 3
+//#define HOSTKEY_COUNT 3
 typedef struct _ssh_hostkeys {
   int count;
-  char *keytypes[HOSTKEY_COUNT];
-  unsigned char *keyvalues[HOSTKEY_COUNT];
-  size_t keylengths[HOSTKEY_COUNT];
+  int *keytypes;             // treated as an array 
+  unsigned char **keyvalues; // treated as an array 
+  size_t *keylengths;        // treated as an array 
 } ssh_hostkeys;
 
 ssh_hostkeys *ssh_hostkeys_new();

@@ -57,7 +57,7 @@ int do_ssh_action(
   char *argv[]) 
 {
   int actr, bctr;
-  char *hostname, *port, *dhash, *argument;
+  char *hostname, *port, *dhash, *argument, *hktype_name;
   ssh_hostkeys *hostkeys;
   ssh_banners banners;
   ssh_session session=NULL;
@@ -135,15 +135,17 @@ int do_ssh_action(
     "Error getting hostkey fingerprints.\n");
 
   for (actr=0; actr< hostkeys->count; actr++) {
+    hktype_name = (char *) ssh_key_type_to_char(hostkeys->keytypes[actr]);
     if (hostkeys->keylengths[actr]) {
       dhash = get_display_hash(hostkeys->keyvalues[actr], 
         hostkeys->keylengths[actr], cmap);
       check(dhash, "Error getting the mapped buffer")
-      printf("%s (%s)\n", dhash, hostkeys->keytypes[actr]);
+      printf("%s (%s)\n", dhash, hktype_name);
       free(dhash);
     }
     else {
-      printf("No key of type %s.\n", hostkeys->keytypes[actr]);
+      printf("No key of type %s (enum value %i).\n", hktype_name, 
+        hostkeys->keytypes[actr]);
     }
   }
 

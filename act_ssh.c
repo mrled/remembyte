@@ -56,8 +56,8 @@ error:
  */
 char *osshv2a(int osshv) {
   int major, minor, patch, major_mask, minor_mask, patch_mask;
-  size_t vstr_len = 100;
-  char *vstr = malloc(vstr_len);
+  size_t vstr_len;
+  char *vstr;
 
   major_mask = 255 << 16;
   minor_mask = 255 << 8;
@@ -67,9 +67,10 @@ char *osshv2a(int osshv) {
   minor = (osshv & minor_mask) >> 8;
   patch = osshv & patch_mask;
 
-  // TODO: error check this
   // TODO: can't use snprintf in real code
-  snprintf(vstr, vstr_len, "%i.%i.%i", major, minor, patch);
+  vstr_len = snprintf(NULL, 0, "%i.%i.%i", major, minor, patch);
+  vstr = malloc((sizeof(char) * vstr_len) +1);
+  snprintf(vstr, vstr_len +1,  "%i.%i.%i", major, minor, patch);
   return vstr;
 }
 

@@ -102,7 +102,7 @@ int do_ssh_action(
   //TODO: Much of this code would be simplified if I could make sure that a 
   //      banners struct is initialized w/ all members pointing to NULL if they
   //      don't exist. Or if they had default values.
-  if (banners.issue_banner) {
+  if (banners.issue_banner && strlen(banners.issue_banner) >0) {
     printf("Issue banner:\n%s\n", banners.issue_banner);
   }
   else {
@@ -116,14 +116,14 @@ int do_ssh_action(
     printf("No server banner.\n");
   }
 
-  if (banners.openssh_version) {
+  if (banners.openssh_version && strlen(banners.openssh_version) >0) {
     printf("OpenSSH version: %s.\n", banners.openssh_version);
   }
   else {
     printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
   }
 
-  if (banners.disconnect_message) {
+  if (banners.disconnect_message && strlen(banners.disconnect_message) >0) {
     printf("Disconnect message: %s.\n", banners.disconnect_message);
   }
   else {
@@ -147,12 +147,12 @@ int do_ssh_action(
     }
   }
 
+  //TODO: need to free the banners struct
   ssh_free(session);
   ssh_hostkeys_free(hostkeys);
   return 0;
 
 error:
-  //TODO: need to free the banners struct
   ssh_free(session);
   ssh_hostkeys_free(hostkeys);
   return -1;
@@ -203,7 +203,7 @@ int do_stdin_action(
 {
   int chunk_max_sz=100, instring_pos, actr, wctr;
   size_t chunk_sz;
-  char *inchunk[chunk_max_sz], *instring=NULL, *instring_new=NULL, 
+  char inchunk[chunk_max_sz], *instring=NULL, *instring_new=NULL, 
     *input_argv[1];
   
   log_arguments_debug(argc, argv);
@@ -214,12 +214,11 @@ int do_stdin_action(
   instring = malloc( sizeof(char) * chunk_max_sz);
 
   wctr = 0;
-  // TODO: do I have the inchunk pointer doing the right thing here? 
-  while (fgets((char*)inchunk, chunk_max_sz, stdin)) {
+  while (fgets(inchunk, chunk_max_sz, stdin)) {
     log_debug("Iteration %i... Read chunk from stdin: '%s'\n", 
       wctr++, inchunk);
 
-    chunk_sz = strlen((const char *)inchunk);
+    chunk_sz = strlen(inchunk);
     instring_new = realloc(instring, strlen(instring) + chunk_sz + 1);
     check_mem(instring)
     instring = instring_new;

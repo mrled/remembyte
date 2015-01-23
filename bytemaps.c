@@ -398,13 +398,10 @@ error:
  * 
  * @return an integer value between 0-15.
  *
- * TODO: why does use of the `inline` keyword produce no errors on Mac OS X but 
- *       fail to compile on Linux? 
  * TODO: make this work with upper case hits as well
  * TODO: what happens if you pass bad data here? 
  */
-//inline int hit2int(char hit) {
-int hit2int(char hit) {
+static inline int hit2int(char hit) {
   check((('0'<=hit<='9') && ('a'<=hit<='f')), "Bad argument: '%c'", hit);
   return ((hit) <= '9' ? (hit) - '0' : (hit) - 'a' + 10);
 error:
@@ -505,6 +502,7 @@ char *get_display_hash(
   char *mapped_buffer=NULL;
 
   check(cmap, "Bad map");
+  check(hash_len >0, "Passed empty buffer");
 
   mapped_buffer = buf2map(hash, hash_len, 
     cmap->separator, cmap->terminator, cmap->rawmapsv, cmap->rawmaps_count);
@@ -561,6 +559,7 @@ buf2map(
     buflen, separator, terminator);
 #endif 
 
+  check(buflen >0, "Tried to map a buffer with a length of 0");
   check(maps_count >= 0, "Tried to map a buffer without passing any maps");
 
   if (separator)  { separator_sz  = strlen(separator);  }
@@ -570,7 +569,6 @@ buf2map(
     septerm_longest = separator_sz;
   }
   else {
-    // +1 for the \0 that will terminate the mapped string
     septerm_longest = terminator_sz +1; 
   }
 

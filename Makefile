@@ -40,8 +40,11 @@ ifndef CCDEBUGARGS
 CCDEBUGARGS=-g -O0
 endif
 
-remembyte: remembyte.c bytemaps.c bytemaps.h act_ssh.c act_ssh.h util.c util.h dbg.c dbg.h inih/ini.c inih/ini.h 
-	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm $(CCINCLUDES) $(CCLIBS) remembyte.c bytemaps.c act_ssh.c util.c dbg.c inih/ini.c -o remembyte 
+RMODH=bytemaps.h act_ssh.h util.h dbg.h inih/ini.h bstrlib/bstrlib.h
+RMODC=bytemaps.c act_ssh.c util.c dbg.c inih/ini.c bstrlib/bstrlib.c
+
+remembyte: remembyte.c $(RMODH) $(RMODC) 
+	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm $(CCINCLUDES) $(CCLIBS) -o remembyte $(RMODC) remembyte.c 
 
 clean:
 	rm -f remembyte

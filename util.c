@@ -87,3 +87,4 @@ bool str2bool(char *str) {
     return false;
   }
 }
+

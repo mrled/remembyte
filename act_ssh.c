@@ -5,6 +5,8 @@
 // TODO: iterate over libssh for keytypes
 
 ssh_hostkeys *ssh_hostkeys_new() {
+  int ix;
+
   ssh_hostkeys *hk=NULL;
   hk = malloc(sizeof(ssh_hostkeys));
   check_mem(hk);
@@ -12,7 +14,9 @@ ssh_hostkeys *ssh_hostkeys_new() {
   hk->keytypes[0] = "ecdsa-sha2-nistp256";
   hk->keytypes[1] = "ssh-dss";
   hk->keytypes[2] = "ssh-rsa";
-  hk->keylengths[hk->count] = 0;
+  for (ix=0; ix< hk->count; ix++) {
+    hk->keylengths[ix] = 0;
+  }
   return hk;
 
 error:
@@ -52,7 +56,8 @@ error:
  */
 char *osshv2a(int osshv) {
   int major, minor, patch, major_mask, minor_mask, patch_mask;
-  char *vstr;
+  size_t vstr_len = 100;
+  char *vstr = malloc(vstr_len);
 
   major_mask = 255 << 16;
   minor_mask = 255 << 8;
@@ -64,8 +69,7 @@ char *osshv2a(int osshv) {
 
   // TODO: error check this
   // TODO: can't use snprintf in real code
-  vstr = malloc(300);
-  snprintf(vstr, 200, "%i.%i.%i\n", major, minor, patch);
+  snprintf(vstr, vstr_len, "%i.%i.%i", major, minor, patch);
   return vstr;
 }
 
@@ -107,39 +111,7 @@ error:
   return -1;
 }
 
-bool print_banners(ssh_banners *banners) {
-  if (banners->issue_banner) {
-    printf("Issue banner:\n%s\n", banners->issue_banner);
-  }
-  else {
-    printf("No issue banner.\n");
-  }
-
-  if (banners->server_banner && strlen(banners->server_banner) >0) {
-    printf("Server banner: %s.\n", banners->server_banner);
-  }
-  else {
-    printf("No server banner.\n");
-  }
-
-  if (banners->openssh_version) {
-    printf("OpenSSH version: %i.\n", banners->openssh_version);
-  }
-  else {
-    printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
-  }
-
-  if (banners->disconnect_message) {
-    printf("Disconnect message: %s.\n", banners->disconnect_message);
-  }
-  else {
-    printf("No disconnect message.\n");
-  }
-
-  return true;
-}
-
-/**
+/*
  * Get host keys for an SSH server
  * 
  * @param session an ssh_session pointer (from libssh), in a disconnected state.
@@ -148,31 +120,32 @@ bool print_banners(ssh_banners *banners) {
  */
 int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
 
-  int kctr;
+  int kctr, rc, ix;
   ssh_key pubkey = NULL;
 
   size_t hkhash_buf_len;
   unsigned char *hkhash_buf;
 
   for (kctr=0; kctr < hostkeys->count; kctr++) {
-    if (ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys->keytypes[kctr]) != 0) {
-      fprintf(stderr, "Error setting SSH option for host key '%s': %s\n", 
-        hostkeys->keytypes[kctr], ssh_get_error(session));
-      return -1;
-    }
 
-    if (ssh_connect(session) != SSH_OK) {
-      // The server does not support the host key type.
-      hostkeys->keyvalues[kctr] = (unsigned char*)"";
-      hostkeys->keylengths[kctr] = 0;
+    hkhash_buf = (unsigned char*)"";
+    hkhash_buf_len = 0;
+
+    rc = ssh_options_set(session, SSH_OPTIONS_HOSTKEYS, hostkeys->keytypes[kctr]);
+    check(rc == 0, "Error setting SSH option for host key '%s': %s\n", 
+      hostkeys->keytypes[kctr], ssh_get_error(session));
+
+    rc = ssh_connect(session);
+    if (rc != SSH_OK) {
+      log_debug("Server does not support type %s", hostkeys->keytypes[kctr]);
     }
 
     else {
+      log_debug("Found server key of type %s", hostkeys->keytypes[kctr]);
 
-      if (ssh_get_publickey(session, &pubkey) != SSH_OK) {
-        fprintf(stderr, "Error getting public key: %s\n", ssh_get_error(session));
-        return -1;
-      }
+      rc = ssh_get_publickey(session, &pubkey);
+      check(rc == SSH_OK, "Error getting public key: %s\n", 
+        ssh_get_error(session));
 
       /* The third ("hash") argument to ssh_get_publickey_hash comes back as a 
        * character buffer of hex values. However, it's padded with zeroes. 
@@ -182,44 +155,22 @@ int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
          (lldb) frame variable ssh_get_hexa(hash, hash_len) // this is lldb pseudocode, of course
          (char *) hexa = 0x000000000119db70 "81:0f:13:29:ab:f2:b4:67:d0:13:89:77:96:5d:6f:01"
        */
-      if (ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, &hkhash_buf_len) != 0) {
-        fprintf(stderr, "Error getting public key hash: %s\n", ssh_get_error(session));
-        return -1;
-      }
-      hostkeys->keyvalues[kctr] = hkhash_buf;
-      hostkeys->keylengths[kctr] = hkhash_buf_len;
+      rc = ssh_get_publickey_hash(pubkey, SSH_PUBLICKEY_HASH_MD5, &hkhash_buf, 
+        &hkhash_buf_len);
+      check(rc == 0, "Error getting public key hash: %s\n", 
+        ssh_get_error(session));
     }
-    ssh_disconnect(session);
+
+    hostkeys->keyvalues[kctr] = hkhash_buf;
+    hostkeys->keylengths[kctr] = hkhash_buf_len;
+
+    ssh_silent_disconnect(session);
   }
 
-  if (pubkey != NULL) {
-    ssh_key_free(pubkey);
-  }
-
+  if (pubkey) ssh_key_free(pubkey);
   return 0;
+
+error:
+  if (pubkey) ssh_key_free(pubkey);
+  return -1;
 }
-
-/*
-bool print_hostkey_fingerprint(ssh_hostkeys *hostkeys, mapping_t mapping) {
-  int kctr;
-  char *display;
-
-  for (kctr=0; kctr< hostkeys->count; kctr++) {
-    if (hostkeys->keylengths[kctr]) {
-      display = get_display_hash(hostkeys->keyvalues[kctr], hostkeys->keylengths[kctr], mapping);
-      if (!display) {
-        fprintf(stderr, "Error getting mapped buffer.\n");
-        return false;
-      }
-      printf("%s (%s)\n", display, hostkeys->keytypes[kctr]);
-    }
-    else {
-      printf("No key of type %s.\n", hostkeys->keytypes[kctr]);
-    }
-  }
-
-  free(display);
-  return true;
-}
- */
-

@@ -7,6 +7,7 @@
 
 #include <libssh/libssh.h>
 
+#include "dbg.h"
 #include "bytemaps.h"
 #include "util.h"
 

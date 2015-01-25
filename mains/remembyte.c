@@ -5,6 +5,8 @@
 
 #include <libssh/libssh.h>
 
+#include "../modules/configuration.h"
+#include "../modules/inih/ini.h"
 #include "../modules/bytemaps.h"
 #include "../modules/act_ssh.h"
 #include "../modules/util.h"
@@ -396,7 +398,7 @@ action_type *remembyte_optparse(
     check(action->cmap, "No such mapping name '%s'", mapname);
   }
   else {
-    action->cmap = get_default_map(*config);
+    action->cmap = (*config)->defaultmap;
     check(action->cmap, "No map name provided on command line, and no "
         "default mapping provided in config file.");
   }

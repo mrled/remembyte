@@ -107,3 +107,31 @@ I may keep the IDE projects around, just for their analysis and debugging capabi
 ### I think I'm going to need to do this now
 
 I want to start writing tests like this: <http://c.learncodethehardway.org/book/ex30.html>. To do that, I need a build system that can support building lots of tiny executables. 
+
+
+## Memory management and dbg.h
+
+`dbg.h` has the `check_mem()` macro, which enables a nullify-malloc-check-free workflow in each functino that needs to rely on allocated memory. Here's a pseudocode example:
+
+    TYPE * new_TYPE() {
+        TYPE *x=NULL;
+
+        check(something == true, "It was false!");
+
+        x=malloc(something);
+        check_mem(x);
+
+        return x;
+
+    error:
+        free(x);
+        return -1;
+    }
+
+That is: 
+
+1. When declaring a pointer that is to be `malloc()`ed, you *must* set it to NULL, so that it can be passed to free() after the `error:` label, even if an error occurs before it is `malloc()`ed. 
+2. Immediately after performing the allocation, run `check_mem()` on the pointer. 
+3. Make sure that the memory is `free()`d after the `error:` label. (If its temporary memory just for use within the function, make sure it's `free()`d before the function returns normally as well.)
+
+

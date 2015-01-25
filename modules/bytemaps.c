@@ -11,7 +11,6 @@
  */
 size_t hex2buf(char * hexstring, unsigned char ** outbuffer) {
   char *normhs=NULL;
-  unsigned char *obuf=NULL;
   size_t outbuffer_len=0;
 
   normhs = normalize_hexstring(hexstring);
@@ -64,39 +63,47 @@ char * normalize_hexstring(char * hexstring) {
   unsigned int iidx=0, oidx=0;
   char ca, cb;
   char *hexstring_norm=NULL;
+  size_t hexstring_len = strlen(hexstring);
 
-  hexstring_norm = malloc(sizeof(char) * strlen(hexstring) +1);
+  hexstring_norm = malloc(sizeof(char) * hexstring_len +1);
   check_mem(hexstring_norm);
 
   if (hexstring[0] == '0' && hexstring[1] == 'x') {
     iidx = 2;
   }
 
-  while (iidx < strlen(hexstring)) {
+  while (iidx < hexstring_len) {
 
     ca = hexstring[iidx];
     cb = hexstring[iidx +1];
 
-    if ('A'<=ca<='F') ca = tolower(ca);
-    if ('A'<=cb<='F') cb = tolower(cb);
+    if (ca == ':') {
+      iidx++;
+    }
+    else {
 
-    check((hit2int(ca) > -1 && hit2int(cb) > -1), "Bad input");
+      if ('A'<=ca<='F') ca = tolower(ca);
+      if ('A'<=cb<='F') cb = tolower(cb);
+      check((hit2int(ca) > -1 && hit2int(cb) > -1), "Bad input");
+
 #ifdef REMEMBYTE_DEBUG_NORMHS
-    log_debug("ca = %c, cb = %c", ca, cb);
+      log_debug("ca = %c, cb = %c", ca, cb);
 #endif
 
-    if (ca != ':') {
       hexstring_norm[oidx] = ca;
       hexstring_norm[oidx+1] = cb;
       oidx += 2;
       iidx += 2;
-    }
-    else {
-      iidx++;
+
     }
   }
-  log_debug("Original hexstring: '%s'; normalized: '%s'", hexstring, 
-    (char*)hexstring_norm);
+  hexstring_norm[oidx++] = '\0';
+  hexstring_norm = realloc(hexstring_norm, oidx);
+  check_mem(hexstring_norm);
+
+  log_debug("Original hexstring '%s' len %zi is normalized to '%s' len %zi.",
+    hexstring, hexstring_len, (char*)hexstring_norm, 
+    strlen(hexstring_norm));
 
   return hexstring_norm;
 

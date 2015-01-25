@@ -438,7 +438,9 @@ char * normalize_hexstring(char * hexstring) {
     if ('A'<=cb<='F') cb = tolower(cb);
 
     check((hit2int(ca) > -1 && hit2int(cb) > -1), "Bad input");
+#ifdef REMEMBYTE_DEBUG_NORMHS
     log_debug("ca = %c, cb = %c", ca, cb);
+#endif
 
     if (ca != ':') {
       hexstring_norm[oidx] = ca;

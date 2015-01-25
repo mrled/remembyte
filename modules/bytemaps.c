@@ -1,22 +1,84 @@
 #include "bytemaps.h"
 
-char *valid_value_separators = ", \0"; // extern defined in bytemaps.h
+char *valid_value_separators = ", "; // extern defined in bytemaps.h
 
 // TODO: I need *_free() functions to match all these *_new() functions
 
 /* Return a pointer to a new configuration_type struct
  */
 configuration_type *configuration_new() {
-  configuration_type *config;
+  configuration_type *config=NULL;
+  rawmap_type *hexrmap=NULL;
+  composedmap_type *hexcmap=NULL;
+  char *hexstring=NULL;
+  int bytemax=256, hexbyte_sz=3;
+  int ix;
+
   config = malloc(sizeof(configuration_type));
   check_mem(config);
-  config->filepath = NULL;
-  config->rawmaps_count = 0;
   config->rawmaps = NULL;
-  config->composedmaps_count = 0;
   config->composedmaps = NULL;
+  config->filepath = NULL;
+
+  // Make the default hex rawmap and composedmap
+  hexrmap = rawmap_new();
+  check_mem(hexrmap);
+  hexrmap->name = "hex";
+  for (ix=0; ix<bytemax; ix++) {
+    hexrmap->map[ix] = NULL;
+  }
+  for (ix=0; ix<bytemax; ix++) {
+    hexstring = malloc(sizeof(char) *hexbyte_sz);
+    check_mem(hexstring);
+    snprintf(hexstring, hexbyte_sz, "%02x", ix);
+    hexrmap->map[ix] = hexstring;
+  }
+
+  config->rawmaps_count = 1;
+  config->rawmaps = malloc(
+    sizeof(rawmap_type*) * config->rawmaps_count);
+  check_mem(config->rawmaps);
+  config->rawmaps[0] = hexrmap;
+
+  hexcmap = composedmap_new();
+  check_mem(hexcmap); 
+  hexcmap->name = "hex";
+  hexcmap->isdefault = true;
+  hexcmap->rawmaps_count = 1;
+  hexcmap->rawmaps = malloc(sizeof(rawmap_type*) * hexcmap->rawmaps_count);
+  check_mem(hexcmap->rawmaps);
+  hexcmap->rawmaps[0] = hexrmap;
+  hexcmap->rawmapsv = malloc(sizeof(char**) * hexcmap->rawmaps_count);
+  check_mem(hexcmap->rawmapsv);
+  hexcmap->rawmapsv[0] = hexrmap->map;
+  hexcmap->separator = ":";
+  hexcmap->terminator = "";
+
+  config->composedmaps_count = 1;
+  config->composedmaps = malloc(
+    sizeof(composedmap_type*) * config->composedmaps_count);
+  check_mem(config->composedmaps);
+  config->composedmaps[0] = hexcmap;
+
   return config;
+
 error:
+  if (config) {
+    free(config->rawmaps);
+    free(config->composedmaps);
+    free(config);
+  }
+  if (hexcmap) {
+    free(hexcmap->rawmaps);
+    free(hexcmap->rawmapsv);
+    free(hexcmap);
+  }
+  if (hexrmap) {
+    for (ix=0; ix<bytemax; ix++) {
+      free(hexrmap->map[ix]);
+    }
+    free(hexrmap);
+  }
   return NULL;
 }
 
@@ -33,6 +95,7 @@ composedmap_type *composedmap_new() {
   cmap->terminator = "";
   return cmap;
 error:  
+  free(cmap);
   return NULL;
 }
 

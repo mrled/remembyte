@@ -5,10 +5,14 @@
 
 #include <libssh/libssh.h>
 
-#include "bytemaps.h"
-#include "act_ssh.h"
-#include "util.h"
-#include "dbg.h"
+#include "../modules/bytemaps.h"
+#include "../modules/act_ssh.h"
+#include "../modules/util.h"
+#include "../modules/dbg.h"
+
+#ifndef INSTALL_PREFIX
+#  define INSTALL_PREFIX "/usr/local"
+#endif
 
 char *ARGV0;
 
@@ -116,7 +120,7 @@ int do_ssh_action(
     printf("No server banner.\n");
   }
 
-  if (banners.openssh_version && strlen(banners.openssh_version) >0) {
+  if (banners.openssh_version !=0 && strlen(banners.openssh_version) >0) {
     printf("OpenSSH version: %s.\n", banners.openssh_version);
   }
   else {
@@ -290,14 +294,21 @@ int do_help_action(
   return 0;
 }
 
-#define CFLOCS_SZ 3
 char *find_default_configfile() {
   int ix;
-  char *cflocs[CFLOCS_SZ] = {
-    "~/.remembyte.conf", "../etc/remembyte.conf", "./remembyte.conf"
+  // Note that there is *no* portable way to find the location of the currently
+  // running executable in C. Naturally. 
+  // So we can't do shit like ../etc/remembyte.conf here b/c that is relative 
+  // to the CWD of the calling proc. 
+  char *cflocs[] = {
+    "~/.remembyte.conf",
+    INSTALL_PREFIX"/etc/remembyte.conf",
+    "./remembyte.conf",
+    "./modules/remembyte.conf", // useful for bin/remembyte in checkout dir
+    NULL
   };
   char *found_file = NULL;
-  for (ix=0; ix<CFLOCS_SZ; ix++) {
+  for (ix=0; cflocs[ix] != NULL; ix++) {
     found_file = resolve_path(cflocs[ix]);
     if (found_file) {
       log_debug("Found default configuration file at '%s'", found_file);

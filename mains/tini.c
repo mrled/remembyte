@@ -5,10 +5,10 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "inih/ini.h"
+#include "../modules/inih/ini.h"
 
-#include "util.h"
-#include "bytemaps.h"
+#include "../modules/util.h"
+#include "../modules/bytemaps.h"
 
 int main(int argc, char* argv[])
 {

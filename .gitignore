@@ -1,5 +1,4 @@
-remembyte
-*.dSYM
+bin/
 
 # Xcode stuff. Informative: 
 # http://stackoverflow.com/questions/49478/git-ignore-file-for-xcode-projects

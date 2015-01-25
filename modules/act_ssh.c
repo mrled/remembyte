@@ -34,7 +34,7 @@ ssh_hostkeys *ssh_hostkeys_new() {
   hk = malloc(sizeof(ssh_hostkeys));
   check_mem(hk);
   
-  hk->count = SSH_KEYTYPE_ECDSA;
+  hk->count = SSH_KEYTYPE_ED25519;
 
   hk->keytypes = malloc(sizeof(int) * hk->count);
   hk->keyvalues = malloc(sizeof(unsigned char*) * hk->count);

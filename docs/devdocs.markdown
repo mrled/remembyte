@@ -103,3 +103,7 @@ I may keep the IDE projects around, just for their analysis and debugging capabi
 - `autoconf`: fuck no, even if it wasn't limited to MinGW or Cygwin on Windows
 - GNU `make` everywhere: impossible if I want to avoid MinGW 
 - `CMake`: maybe. I don't like the idea of another tool, but it is *one* syntax for all platforms
+
+### I think I'm going to need to do this now
+
+I want to start writing tests like this: <http://c.learncodethehardway.org/book/ex30.html>. To do that, I need a build system that can support building lots of tiny executables. 

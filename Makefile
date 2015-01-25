@@ -1,51 +1,33 @@
-# remembyte Makefile
-# 
-# Override variables by creating a new makefile, setting your variables, and 
-# including this Makefile. 
-#
-# For example, you might create a new makefile called new_Makefile.txt and 
-# saving the following: 
-#
-#     CCINCLUDES=-I${HOME}/opt/homebrew/include 
-#     CCLIBS=-L${HOME}/opt/homebrew/lib
-#     include Makefile
-#
-# Now invoke make with the `-f` flag and tell it to use your new makefile: 
-#
-#     make -f ./new_Makefile.txt
-#
+CC=clang
+#CFLAGS?=-Wall
+#CCINCLUDES=?
+#CCLIBS=?
+CCDEBUGARGS?=-g -O0
+LINKER=-lssh -lm
 
-# TODO: when I use CC as the variable name here, my Linux machine appears to 
-#       use /bin/cc even if AFAICT $CC is not defined in my shell. I use 
-#       $CCOMPILER instead to hack around that, but I wonder if there's a better
-#       way.
-ifndef CCOMPILER
-CCOMPILER=clang
-endif
+MODULESH=$(wildcard modules/*.h modules/*/*.h)
+MODULESC=$(wildcard modules/*.c modules/*/*.c)
+$(warning Found these module source files: $(MODULESH) $(MODULESC))
 
-ifndef CFLAGS
-#CFLAGS=-Wall
-CFLAGS=
-endif
+MAINSC=$(wildcard mains/*.c)
+MAINSX=$(patsubst mains/%.c,%,$(MAINSC))
+$(warning Found these main source files: $(MAINSC))
+$(warning Will compile to these main binaries: $(MAINSX))
 
-ifndef CCINCLUDES
-CCINCLUDES=
-endif
+$(warning CC: $(CC))
+$(warning CCDEBUGARGS: $(CCDEBUGARGS))
+$(warning CFLAGS: $(CFLAGS))
+$(warning CCINCLUDES: $(CCINCLUDES))
+$(warning CCLIBS: $(CCLIBS))
 
-ifndef CCLIBS
-CCLIBS=
-endif
+all: bin mains
 
-ifndef CCDEBUGARGS
-CCDEBUGARGS=-g -O0
-endif
+mains: bin $(MAINSX)
+$(MAINSX): $(MAINSC) $(MODULESC) $(MODULESH)
+	$(CC) $(CCDEBUGARGS) $(CFLAGS) $(LINKER) $(CCINCLUDES) $(CCLIBS) $(MODULESC) mains/$@.c -o bin/$@
 
-RMODH=bytemaps.h act_ssh.h util.h dbg.h inih/ini.h bstrlib/bstrlib.h
-RMODC=bytemaps.c act_ssh.c util.c dbg.c inih/ini.c bstrlib/bstrlib.c
-
-remembyte: remembyte.c $(RMODH) $(RMODC) 
-	$(CCOMPILER) $(CCDEBUGARGS) -lssh -lm $(CCINCLUDES) $(CCLIBS) -o remembyte $(RMODC) remembyte.c 
+bin: 
+	mkdir -p bin
 
 clean:
-	rm -f remembyte
-	rm -rf remembyte.dSYM
+	rm -rf bin

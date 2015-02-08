@@ -2,8 +2,6 @@
 
 char *valid_value_separators = ", "; // extern defined in bytemaps.h
 
-// TODO: have a function to update the default composedmap in a configuration
-
 /* Return a pointer to a new configuration_type struct
  */
 configuration_type *configuration_new() {
@@ -209,8 +207,7 @@ rawmap_type * a2rawmap_type(
  * 
  * nonreentrant: uses strtok(), static local vars
  *
- * TODO: 
- * - error checking?  what's that? 
+ * TODO: error checking? what's that? 
  * 
  * @param configuration a pointer to a struct that will contain our config data
  * @param section the name of the current section 
@@ -444,7 +441,3 @@ void print_configuration_type(
   }
 
 }
-
-
-// TODO: deal with Unicode. These functions will work with ASCII and UTF-8, but
-// nothing else

@@ -25,6 +25,8 @@ size_t hex2buf(char * hexstring, unsigned char ** outbuffer) {
   return outbuffer_len;
 
 error:
+  free(*outbuffer);
+  *outbuffer = NULL;
   free(normhs);
   return -1;
 }
@@ -41,7 +43,6 @@ error:
  * @return an integer value between 0-15.
  *
  * TODO: make this work with upper case hits as well
- * TODO: what happens if you pass bad data here? 
  */
 static inline int hit2int(char hit) {
   check((('0'<=hit<='9') && ('a'<=hit<='f')), "Bad argument: '%c'", hit);

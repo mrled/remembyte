@@ -64,6 +64,9 @@ v2.0 (and beyond):
 
 -   Remove requirement for libssh - implement just the part of the protocol I 
     need myself
+-   Otherwise, consider using a different convention for the functions in the
+    act_ssh module to make it clear where the function is defined (and also to 
+    protect against libssh making new functions that conflict with mine)
 
 ## Misc Tasks
 

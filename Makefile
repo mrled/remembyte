@@ -2,7 +2,7 @@ CC=clang
 #CFLAGS?=-Wall
 #CCINCLUDES=?
 #CCLIBS=?
-CCDEBUGARGS?=-g -O0
+CCDEBUGARGS=-DNDEBUG
 LINKER=-lssh -lm
 
 MODULESH=$(wildcard modules/*.h modules/**/*.h)
@@ -19,18 +19,22 @@ TESTSX=$(patsubst tests/%.c,%,$(TESTSC))
 $(warning Found these test source files: $(TESTSC))
 $(warning Will compile to these test binaries: $(TESTSX))
 
-$(warning CC: $(CC))
-$(warning CCDEBUGARGS: $(CCDEBUGARGS))
-$(warning CFLAGS: $(CFLAGS))
-$(warning CCINCLUDES: $(CCINCLUDES))
-$(warning CCLIBS: $(CCLIBS))
+#$(warning CC: $(CC))
+#$(warning CCDEBUGARGS: $(CCDEBUGARGS))
+#$(warning CFLAGS: $(CFLAGS))
+#$(warning CCINCLUDES: $(CCINCLUDES))
+#$(warning CCLIBS: $(CCLIBS))
 
 all: bin mains
+
+debug: CCDEBUGARGS=-g -O0 -Wall
+debug: all
 
 mains: bin $(MAINSX)
 $(MAINSX): $(MAINSC) $(MODULESC) $(MODULESH)
 	$(CC) $(CCDEBUGARGS) $(CFLAGS) $(LINKER) $(CCINCLUDES) $(CCLIBS) $(MODULESC) mains/$@.c -o bin/$@
 
+tests: CCDEBUGARGS=-g -O0
 tests: bin $(TESTSX)
 $(TESTSX): 
 	$(CC) $(CCDEBUGARGS) $(CFLAGS) $(LINKER) $(CCINCLUDES) $(CCLIBS) $(MODULESC) tests/$@.c -o bin/$@

@@ -108,10 +108,29 @@ I may keep the IDE projects around, just for their analysis and debugging capabi
 
 I want to start writing tests like this: <http://c.learncodethehardway.org/book/ex30.html>. To do that, I need a build system that can support building lots of tiny executables. 
 
+### Option A 201502 - `cmake` 
+
+In order to use `cmake`, I think I would explicitly build the remembyte library, then link against it for the remembyte command line utility. Additionally, I would write tests in special functions that take no arguments and follow a naming convention, and use a code generation tool (or maybe `cmake` itself?) to generate a separate executable with a `main()` function that runs all my tests. 
+
+This lets me write a simple (though more explicit) `CMakeLists.txt` but still accomplishes all my goals.
+
+### Option B 201502 - GNU `make` everywhere
+
+GNU `make` is available as a standalone executable from the GNUWin32 project - no mingw required. However, shelling out (required for common commands like `rm`) is still not cross platform without mingw. 
+
+I would write a Makefile "library" that would be included into my main Makefile, which defines all the external commands I would need like 
+
+    if COMSPEC
+        MV=move
+    else
+        MV=mv
+    endif
+
+The library Makefile would be ugly, but the goal would be a readable main `Makefile`.
 
 ## Memory management and dbg.h
 
-`dbg.h` has the `check_mem()` macro, which enables a nullify-malloc-check-free workflow in each functino that needs to rely on allocated memory. Here's a pseudocode example:
+`dbg.h` has the `check_mem()` macro, which enables a nullify-malloc-check-free workflow in each function that needs to rely on allocated memory. Here's a pseudocode example:
 
     TYPE * new_TYPE() {
         TYPE *x=NULL;
@@ -125,7 +144,7 @@ I want to start writing tests like this: <http://c.learncodethehardway.org/book/
 
     error:
         free(x);
-        return -1;
+        return NULL;
     }
 
 That is: 

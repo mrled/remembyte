@@ -28,11 +28,14 @@ typedef struct _ssh_hostkeys {
 } ssh_hostkeys;
 
 ssh_hostkeys *ssh_hostkeys_new();
-void ssh_hostkeys_free(ssh_hostkeys*);
+void ssh_hostkeys_free(ssh_hostkeys *hk);
 
-char *osshv2a(int);
+ssh_banners *ssh_banners_new();
+void ssh_banners_free(ssh_banners *ban);
 
-int get_banners(ssh_session, ssh_banners*);
-int get_hostkey_fingerprint(ssh_session, ssh_hostkeys*);
+char *osshv2a(int osshv);
+
+ssh_banners *get_banners(ssh_session session);
+int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys);
 
 #endif

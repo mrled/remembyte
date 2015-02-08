@@ -30,13 +30,23 @@ action_type *action_new() {
   check_mem(action);
   action->argc = 0;
   action->argv = NULL;
-  action->cmap = composedmap_new();
-  check_mem(action->cmap);
+  action->cmap = NULL;
+  //check_mem(action->cmap);
   action->func = NULL;
   return action;
 error:
   free(action);
   return NULL;
+}
+
+/* Free an action_type
+ * Note that the composedmap it references is not freed, because it may still 
+ * be used in the configuration
+ */ 
+void action_free(action_type *action) {
+  free(action->argv);
+  free(action);
+  action = NULL;
 }
 
 void remembyte_help() {
@@ -64,8 +74,8 @@ int do_ssh_action(
 {
   int actr, bctr;
   char *hostname, *port, *dhash, *argument, *hktype_name;
-  ssh_hostkeys *hostkeys;
-  ssh_banners banners;
+  ssh_hostkeys *hostkeys=NULL;
+  ssh_banners *banners=NULL;
   ssh_session session=NULL;
 
   log_arguments_debug(argc, argv);
@@ -96,52 +106,31 @@ int do_ssh_action(
   ssh_options_set(session, SSH_OPTIONS_HOST, hostname);
   ssh_options_set(session, SSH_OPTIONS_PORT_STR, port);
 
-  // Test the connection & exit if it fails:
   check (ssh_connect(session) == SSH_OK, "Error connecting to %s:%s - '%s'",
      hostname, port, ssh_get_error(session));
   ssh_disconnect(session);
 
-  // Print SSH get_banners:
-  check(get_banners(session, &banners) == 0, "Error getting banners");
+  banners = get_banners(session);
+  check(get_banners, "Error getting banners");
 
+  printf("Issue banner: %s\n", 
+    banners->issue_banner ? banners->issue_banner : "None");
+  printf("Server banner: %s\n", 
+    banners->server_banner ? banners->server_banner : "None");
+  printf("OpenSSH version: %s\n", 
+    banners->openssh_version ? banners->openssh_version 
+      : "Unavailable (or server is not OpenSSH)");
+  printf("Disconnect message: %s\n", 
+    banners->disconnect_message ? banners->disconnect_message : "None");
 
-  //TODO: Much of this code would be simplified if I could make sure that a 
-  //      banners struct is initialized w/ all members pointing to NULL if they
-  //      don't exist. Or if they had default values.
-  if (banners.issue_banner && strlen(banners.issue_banner) >0) {
-    printf("Issue banner:\n%s\n", banners.issue_banner);
-  }
-  else {
-    printf("No issue banner.\n");
-  }
-
-  if (banners.server_banner && strlen(banners.server_banner) >0) {
-    printf("Server banner: %s.\n", banners.server_banner);
-  }
-  else {
-    printf("No server banner.\n");
-  }
-
-  if (banners.openssh_version !=0 && strlen(banners.openssh_version) >0) {
-    printf("OpenSSH version: %s.\n", banners.openssh_version);
-  }
-  else {
-    printf("OpenSSH version: unavailable (or server is not OpenSSH).\n");
-  }
-
-  if (banners.disconnect_message && strlen(banners.disconnect_message) >0) {
-    printf("Disconnect message: %s.\n", banners.disconnect_message);
-  }
-  else {
-    printf("No disconnect message.\n");
-  }
-
-  // Print SSH host key fingerprints: 
   check(get_hostkey_fingerprint(session, hostkeys) == 0, 
     "Error getting hostkey fingerprints.\n");
 
-  for (actr=0; actr< hostkeys->count; actr++) {
+  for (actr=1; actr< hostkeys->count; actr++) {
     hktype_name = (char *) ssh_key_type_to_char(hostkeys->keytypes[actr]);
+    log_debug("Checking for key of type %s (enum value %i)", hktype_name,
+      hostkeys->keytypes[actr]);
+
     if (hostkeys->keylengths[actr]) {
       dhash = get_display_hash(hostkeys->keyvalues[actr], 
         hostkeys->keylengths[actr], cmap);
@@ -150,18 +139,18 @@ int do_ssh_action(
       free(dhash);
     }
     else {
-      printf("No key of type %s (enum value %i).\n", hktype_name, 
-        hostkeys->keytypes[actr]);
+      printf("No key of type %s\n", hktype_name);
     }
   }
 
-  //TODO: need to free the banners struct
   ssh_free(session);
+  ssh_banners_free(banners);
   ssh_hostkeys_free(hostkeys);
   return 0;
 
 error:
   ssh_free(session);
+  ssh_banners_free(banners);
   ssh_hostkeys_free(hostkeys);
   return -1;
 }
@@ -174,8 +163,8 @@ int do_input_action(
 {
   int actr;
   size_t buflen;
-  char *argument, *mapped_buffer;
-  unsigned char *buffer;
+  char *argument, *mapped_buffer=NULL;
+  unsigned char *buffer=NULL;
 
   log_arguments_debug(argc, argv);
 
@@ -195,11 +184,13 @@ int do_input_action(
     printf("%s => %s\n", argument, mapped_buffer);
   }
 
-  // TODO: do I have to free 'mapped_buffer'? 
-  // TODO: do I have to free 'buffer'? 
+  free(mapped_buffer);
+  free(buffer);
   return 0;
 
 error:
+  free(mapped_buffer);
+  free(buffer);
   return -1;
 }
 
@@ -209,7 +200,7 @@ int do_stdin_action(
   int argc, 
   char *argv[]) 
 {
-  int chunk_max_sz=100, instring_pos, actr, wctr;
+  int chunk_max_sz=100, instring_pos, wctr;
   size_t chunk_sz;
   char inchunk[chunk_max_sz], *instring=NULL, *instring_new=NULL, 
     *input_argv[1];
@@ -272,7 +263,7 @@ int do_map_action(
   }
 
   mapped_buffer = get_display_hash(buffer, 256, cmap);
-  check_mem(mapped_buffer); // TODO: is this right for return val of get_display_hash() ?
+  check(mapped_buffer != NULL, "Error getting display hash");
 
   printf("%s\n", mapped_buffer);
 
@@ -367,7 +358,6 @@ action_type *remembyte_optparse(
     // Apply global flags
     if (strlen(argument) == 2 && argument[0] == '-') { 
       if (argument[1] == 'h') {
-        // TODO: Is this really what I want to do? It breaks the control flow model.
         remembyte_help();
         exit(0);
       }
@@ -409,7 +399,7 @@ action_type *remembyte_optparse(
   return action;
 
 error: 
-  // TODO: free action
+  action_free(action);
   free(mapname);
   return NULL;
 }
@@ -418,18 +408,18 @@ int main(int argc, char *argv[]) {
   action_type *action;
   int actionret;
   configuration_type *configuration;
-  composedmap_type cmap;
 
   ARGV0 = argv[0];
 
   action = remembyte_optparse(argc, argv, &configuration);
-  check(action, "Error parsing command line options"); // TODO: this error message doesn't cover every situation
+  check(action, "Error parsing command line options");
   
   actionret = action->func(configuration, action->cmap, action->argc, action->argv);
+  action_free(action);
   return actionret;
 
 error:
-  // TODO: free action
+  action_free(action);
   return -1;
 }
 

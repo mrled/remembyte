@@ -1,10 +1,5 @@
 #include "act_ssh.h"
 
-// TODO: need a corresponding _free()
-// TODO: names in this file shouldn't look like libssh function names
-// TODO: iterate over libssh for keytypes
-
-
 /* In libssh.h: 
 
 enum ssh_keytypes_e{
@@ -25,7 +20,8 @@ enum ssh_keytypes_e{
 
  * ... it works? But it doesn't get returned for anything from 
  * ssh_key_type_to_char() ?
-  */
+ *
+ */
 ssh_hostkeys *ssh_hostkeys_new() {
   int ix;
   char *hktype_name;
@@ -67,12 +63,25 @@ ssh_banners *ssh_banners_new() {
 
   ban->issue_banner = NULL;
   ban->server_banner = NULL;
-  ban->openssh_version = 0;
+  ban->openssh_version = NULL;
   ban->disconnect_message = NULL;
+
+  return ban;
 
 error:
   free(ban);
   return NULL;
+}
+
+/* Free an ssh_banners struct pointer
+ *
+ * TODO: Do I need to free server_banner and disconnect_message?
+ * This is not clear from libssh's docs
+ */
+void ssh_banners_free(ssh_banners *ban) {
+  free(ban->openssh_version);
+  free((void*)ban->issue_banner);
+  free(ban);
 }
 
 /* Take an integer from ssh_get_openssh_version() and print the version it 
@@ -99,7 +108,6 @@ char *osshv2a(int osshv) {
   minor = (osshv & minor_mask) >> 8;
   patch = osshv & patch_mask;
 
-  // TODO: can't use snprintf in real code
   vstr_len = snprintf(NULL, 0, "%i.%i.%i", major, minor, patch);
   vstr = malloc((sizeof(char) * vstr_len) +1);
   snprintf(vstr, vstr_len +1,  "%i.%i.%i", major, minor, patch);
@@ -110,18 +118,18 @@ char *osshv2a(int osshv) {
  * Get banners and version information for an SSH server
  * 
  * @param session an ssh_session pointer (from libssh), in a disconnected state.
- * @param banners pointer to an ssh_banners struct (defined in the header).
- * @return -1 for failures, 0 for successes
+ * @return NULL on failure, a pointer to an ssh_banners struct on success
  */
-int get_banners(ssh_session session, ssh_banners *banners) {
+ssh_banners *get_banners(ssh_session session) {
   char *hostname = NULL;
   unsigned int port = 0;
+  ssh_banners *banners=NULL;
+
+  banners = ssh_banners_new();
+  check_mem(banners);
 
   ssh_options_get(session, SSH_OPTIONS_HOST, &hostname);
   ssh_options_get_port(session, &port);
-
-  check(session != SSH_OK, "Error connecting to %s:%u - '%s'", 
-    hostname, port, ssh_get_error(session));
 
   // TODO: why doesn't ssh_get_issue_banner work? 
   // I can set a banner that openssh will display but this won't.
@@ -131,17 +139,15 @@ int get_banners(ssh_session session, ssh_banners *banners) {
   banners->openssh_version_int = ssh_get_openssh_version(session);
   banners->openssh_version = osshv2a(banners->openssh_version_int);
 
-  /* This does not actually initiate a disconnect.*/
+  // Note: ssh_get_disconnect_message() does not itself initiate a disconnect 
   banners->disconnect_message = ssh_get_disconnect_message(session);
-
   ssh_disconnect(session);
 
-  // TODO: Free memory here duh
-
-  return 0;
+  return banners;
 
 error:
-  return -1;
+  ssh_banners_free(banners);
+  return NULL;
 }
 
 /*
@@ -152,7 +158,7 @@ error:
  * @return -1 for failures, 0 for successes
  */
 int get_hostkey_fingerprint(ssh_session session, ssh_hostkeys *hostkeys) {
-  int kctr, rc, ix;
+  int kctr, rc;
   ssh_key pubkey = NULL;
   size_t hkhash_buf_len;
   unsigned char *hkhash_buf;

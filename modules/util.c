@@ -1,6 +1,5 @@
 #include "util.h"
 
-// Why the fuck don't these exist in the standard
 bool safe_strncmp(const char * str1, const char * str2, size_t len) {
   if ((strlen(str1) >= len) &&
     (strlen(str2) >= len) &&
@@ -22,10 +21,7 @@ bool safe_strcmp(const char * str1, const char * str2) {
 }
 
 
-/* Of course the fucking standard doesn't have a cross-platform way to resolve
- * a fucking path
- * 
- * Take a path that might contain ., .., extraneous /, or a ~ character, and 
+/* Take a path that might contain ., .., extraneous /, or a ~ character, and 
  * return the absolute path that the user intends
  */
 char * resolve_path(const char *path)
@@ -63,7 +59,6 @@ char * resolve_path(const char *path)
     }
   }
 
-  // TODO: this isn't cross platform yet
   resolved = realpath(query, NULL);
   if (!resolved) {
     log_debug("Could not resolve path for query '%s'", path);

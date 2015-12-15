@@ -1,3 +1,20 @@
+# remembyte Makefile
+# 
+# Override variables on the commandline or by creating a new Makefile that
+# includes this one.
+#
+# You can override them on the commandline like so: 
+#     CCINCLUDES=-I/path/to/extra/include/dir
+#     CCLIBS=-L/path/to/extra/lib/dir
+#
+# You can override them in a new Makefile by creating a file like this:
+#     CCINCLUDES=-I/path/to/extra/include/dir
+#     CCLIBS=/path/to/extra/lib/dir
+#     include Makefile
+# Save the new Makefile in this directory and invoke make with the `-f` flag:
+#     make -f ./new_Makefile.txt
+#
+
 CC=clang
 #CFLAGS?=-Wall
 #CCINCLUDES=?
